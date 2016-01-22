@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<OrleansConfiguration xmlns="urn:orleans">
+  <Globals>
+    <BootstrapProviders>
+      <Provider Type="OrleansRaft.RaftBootstrap" Name="Raft Bootstrap Provider" />
+    </BootstrapProviders>
+    <SeedNode Address="localhost" Port="11111"/>
+    <Messaging ResponseTimeout="30s"/>
+  </Globals>
+  <Defaults>
+    <Tracing DefaultTraceLevel="Error" TraceToConsole="true" PropagateActivityId="false" BulkMessageLimit="1000"></Tracing>
+    <Statistics MetricsTableWriteInterval="30s" PerfCounterWriteInterval="30s" LogWriteInterval="300s" WriteLogStatisticsToTable="true" StatisticsCollectionLevel="Info"/>
+  </Defaults>
+
+  <Override Node="silo1">
+    <Networking Address="localhost" Port="11111" />
+    <ProxyingGateway Address="localhost" Port="30000" />
+  </Override>
+  
+  <Override Node="silo2">
+    <Networking Address="localhost" Port="11112" />
+    <ProxyingGateway Address="localhost" Port="30002" />
+  </Override>
+
+  <Override Node="silo3">
+    <Networking Address="localhost" Port="11113" />
+    <ProxyingGateway Address="localhost" Port="30003" />
+  </Override>
+</OrleansConfiguration>
+
+
