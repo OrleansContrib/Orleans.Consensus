@@ -26,9 +26,7 @@ namespace OrleansRaft
         int term;
         string votedFor = null;
         string leader = null;
-
-
-        // this is based on the dodgey assumption that nodes will be names 1/3 2/3 & 3/3
+        
         async Task CaptureClusterMembership()
         {
             nodeName = this.GetPrimaryKeyString();
@@ -38,7 +36,7 @@ namespace OrleansRaft
             otherNodes = hosts.Select(x => x.Key.ToString()).Where(x => x != nodeName).ToArray();
         }
 
-
+        // grains will be named after their host silo
         public override async Task OnActivateAsync()
         {
             Console.WriteLine($"{this.GetPrimaryKeyString()} activating");
