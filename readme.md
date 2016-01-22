@@ -16,7 +16,7 @@ run the `test.cmd` in the `bin\debug` directory. This will start a three silo cl
 
 ## TODO
 
-* Allow a user then exploit the leader, by hooking in to election events.
+* Allow a user then to exploit the leader, by hooking in to election events, thus allowing a singleton in the cluster.
 * Work out how changes in cluster membership change the election process.
 * Lots of testing.
 
