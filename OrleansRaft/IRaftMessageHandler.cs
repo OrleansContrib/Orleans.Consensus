@@ -3,7 +3,7 @@ namespace OrleansRaft
     using System.Collections.Generic;
     using System.Threading.Tasks;
 
-    using OrleansRaft.Messages;
+    using Orleans.Raft.Contract.Messages;
 
     public interface IRaftMessageHandler<TOperation>
     {

@@ -1,9 +1,9 @@
-﻿namespace OrleansRaft.Messages
+﻿namespace Orleans.Raft.Contract.Messages
 {
     using System;
     using System.Collections.Generic;
 
-    using OrleansRaft.Log;
+    using Orleans.Raft.Contract.Log;
 
     [Serializable]
     public class AppendRequest<TOperation> : IMessage

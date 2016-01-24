@@ -1,8 +1,8 @@
-namespace OrleansRaft.Messages
+namespace Orleans.Raft.Contract.Messages
 {
     using System;
 
-    using OrleansRaft.Log;
+    using Orleans.Raft.Contract.Log;
 
     [Serializable]
     public class RequestVoteRequest : IMessage

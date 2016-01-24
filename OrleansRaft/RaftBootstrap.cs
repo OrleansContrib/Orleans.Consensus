@@ -5,8 +5,10 @@ using System.Threading.Tasks;
 
 namespace OrleansRaft
 {
+    using Orleans.Raft.Contract;
+    using Orleans.Raft.Contract.Messages;
+
     using OrleansRaft.Actors;
-    using OrleansRaft.Messages;
 
     public class RaftBootstrap : IBootstrapProvider
     {
@@ -25,6 +27,7 @@ namespace OrleansRaft
 
         public Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
         {
+#if false
             Task.Factory.StartNew(
                 async () =>
                 {
@@ -42,20 +45,22 @@ namespace OrleansRaft
                             log.Info("Trying to replicate a log entry...");
                             await grain.AddValue($"please agree {num}");
                             num++;
+                            await Task.Delay(TimeSpan.FromSeconds(2));
                         }
                         catch (NotLeaderException exception)
                         {
                             leader = exception.Leader;
                             log.Warn(-1, $"Exception replicating value: {exception}, leader is {leader}");
+                            await Task.Delay(TimeSpan.FromSeconds(4));
                         }
                         catch (Exception exception)
                         {
                             log.Info(-1, $"Exception replicating value: {exception}");
+                            await Task.Delay(TimeSpan.FromSeconds(4));
                         }
-
-                        await Task.Delay(TimeSpan.FromSeconds(4));
                     }
                 });
+#endif
             return Task.FromResult(0);
         }
     }

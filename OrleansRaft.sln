@@ -5,6 +5,10 @@ VisualStudioVersion = 14.0.24720.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrleansRaft", "OrleansRaft\OrleansRaft.csproj", "{37611AB7-9468-44BB-8B45-C33D2FD58F94}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestConsole", "TestConsole\TestConsole.csproj", "{ADD0E713-6ACC-4A49-B333-A95C69C2AF4C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Raft.Contract", "Orleans.Raft.Contract\Orleans.Raft.Contract.csproj", "{817A79EE-927A-4571-9B50-ED42E6B87079}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +19,14 @@ Global
 		{37611AB7-9468-44BB-8B45-C33D2FD58F94}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{37611AB7-9468-44BB-8B45-C33D2FD58F94}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{37611AB7-9468-44BB-8B45-C33D2FD58F94}.Release|Any CPU.Build.0 = Release|Any CPU
+		{ADD0E713-6ACC-4A49-B333-A95C69C2AF4C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ADD0E713-6ACC-4A49-B333-A95C69C2AF4C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ADD0E713-6ACC-4A49-B333-A95C69C2AF4C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ADD0E713-6ACC-4A49-B333-A95C69C2AF4C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{817A79EE-927A-4571-9B50-ED42E6B87079}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{817A79EE-927A-4571-9B50-ED42E6B87079}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{817A79EE-927A-4571-9B50-ED42E6B87079}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{817A79EE-927A-4571-9B50-ED42E6B87079}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

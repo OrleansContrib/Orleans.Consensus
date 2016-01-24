@@ -1,14 +1,15 @@
 ﻿using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("OrleansRaft")]
+[assembly: AssemblyTitle("Orleans.Raft.Contract")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("OrleansRaft")]
+[assembly: AssemblyProduct("Orleans.Raft.Contract")]
 [assembly: AssemblyCopyright("Copyright ©  2016")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
@@ -19,7 +20,7 @@ using System.Runtime.InteropServices;
 [assembly: ComVisible(false)]
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
-[assembly: Guid("37611ab7-9468-44bb-8b45-c33d2fd58f94")]
+[assembly: Guid("817a79ee-927a-4571-9b50-ed42e6b87079")]
 
 // Version information for an assembly consists of the following four values:
 //

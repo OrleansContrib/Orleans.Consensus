@@ -1,4 +1,4 @@
-namespace OrleansRaft.Log
+namespace Orleans.Raft.Contract.Log
 {
     using System;
     using System.Collections.Generic;

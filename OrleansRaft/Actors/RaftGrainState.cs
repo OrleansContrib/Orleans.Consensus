@@ -1,7 +1,5 @@
 ﻿using Orleans.CodeGeneration;
-
-using OrleansRaft;
-using OrleansRaft.Messages;
+using Orleans.Raft.Contract.Messages;
 
 [assembly: KnownType(typeof(NotLeaderException))]
 namespace OrleansRaft.Actors
@@ -10,14 +8,11 @@ namespace OrleansRaft.Actors
 
     using Orleans;
 
-    using OrleansRaft.Log;
-
     [Serializable]
-    public class RaftGrainState<TOperation> : GrainState
+    public class RaftGrainState : GrainState
     {
         public string VotedFor { get; set; }
         public long CurrentTerm { get; set; }
-        public Log<TOperation> Log { get; set; } = new Log<TOperation>();
     }
 }
  

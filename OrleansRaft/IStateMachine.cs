@@ -2,7 +2,7 @@ namespace OrleansRaft
 {
     using System.Threading.Tasks;
 
-    using OrleansRaft.Log;
+    using Orleans.Raft.Contract.Log;
 
     public interface IStateMachine<TOperationType>
     {

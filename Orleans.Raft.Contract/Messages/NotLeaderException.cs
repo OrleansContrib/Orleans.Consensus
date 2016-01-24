@@ -1,4 +1,4 @@
-namespace OrleansRaft.Messages
+namespace Orleans.Raft.Contract.Messages
 {
     using System;
     using System.Runtime.Serialization;
