@@ -1,13 +1,11 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="..\packages\Microsoft.Orleans.Templates.Grains.1.1.2\build\Microsoft.Orleans.Templates.Grains.props" Condition="Exists('..\packages\Microsoft.Orleans.Templates.Grains.1.1.2\build\Microsoft.Orleans.Templates.Grains.props')" />
-  <Import Project="..\packages\Microsoft.Orleans.Templates.Interfaces.1.1.2\build\Microsoft.Orleans.Templates.Interfaces.props" Condition="Exists('..\packages\Microsoft.Orleans.Templates.Interfaces.1.1.2\build\Microsoft.Orleans.Templates.Interfaces.props')" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{37611AB7-9468-44BB-8B45-C33D2FD58F94}</ProjectGuid>
-    <OutputType>Library</OutputType>
+    <OutputType>Exe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>OrleansRaft</RootNamespace>
     <AssemblyName>OrleansRaft</AssemblyName>
@@ -34,6 +32,9 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
+  <PropertyGroup>
+    <StartupObject>OrleansRaft.Program</StartupObject>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="Microsoft.CodeAnalysis, Version=1.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.CodeAnalysis.Common.1.0.0\lib\net45\Microsoft.CodeAnalysis.dll</HintPath>
@@ -55,12 +56,20 @@
       <HintPath>..\packages\Microsoft.Orleans.OrleansCodeGenerator.1.1.2\lib\net451\OrleansCodeGenerator.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="OrleansCounterControl, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Orleans.CounterControl.1.1.2\lib\net451\OrleansCounterControl.exe</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="OrleansDependencyInjection, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.Orleans.OrleansRuntime.1.1.2\lib\net451\OrleansDependencyInjection.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="OrleansHost, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.Orleans.OrleansHost.1.1.2\lib\net451\OrleansHost.exe</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="OrleansProviders, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Orleans.OrleansProviders.1.1.2\lib\net451\OrleansProviders.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="OrleansRuntime, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
@@ -85,12 +94,25 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Messages.cs" />
-    <Compile Include="IRaftGrain.cs" />
+    <Compile Include="Messages\AppendResponse.cs" />
+    <Compile Include="Messages\IMessage.cs" />
+    <Compile Include="IRaftMessageHandler.cs" />
+    <Compile Include="IStateMachine.cs" />
+    <Compile Include="Actors\ITestRaftGrain.cs" />
+    <Compile Include="Log\Log.cs" />
+    <Compile Include="Log\LogEntry.cs" />
+    <Compile Include="Log\LogEntryId.cs" />
+    <Compile Include="Messages\AppendRequest.cs" />
+    <Compile Include="Actors\IRaftGrain.cs" />
+    <Compile Include="Messages\NotLeaderException.cs" />
+    <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Properties\orleans.codegen.cs" />
     <Compile Include="RaftBootstrap.cs" />
-    <Compile Include="RaftGrain.cs" />
+    <Compile Include="Actors\RaftGrainState.cs" />
+    <Compile Include="Messages\RequestVoteRequest.cs" />
+    <Compile Include="Messages\RequestVoteResponse.cs" />
+    <Compile Include="Actors\SmRaftGrain.cs" />
+    <Compile Include="Actors\TestRaftGrain.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -108,17 +130,6 @@
     </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
-    <PropertyGroup>
-      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
-    </PropertyGroup>
-    <Error Condition="!Exists('..\packages\Microsoft.Orleans.Templates.Interfaces.1.1.2\build\Microsoft.Orleans.Templates.Interfaces.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.Orleans.Templates.Interfaces.1.1.2\build\Microsoft.Orleans.Templates.Interfaces.props'))" />
-    <Error Condition="!Exists('..\packages\Microsoft.Orleans.Templates.Interfaces.1.1.2\build\Microsoft.Orleans.Templates.Interfaces.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.Orleans.Templates.Interfaces.1.1.2\build\Microsoft.Orleans.Templates.Interfaces.targets'))" />
-    <Error Condition="!Exists('..\packages\Microsoft.Orleans.Templates.Grains.1.1.2\build\Microsoft.Orleans.Templates.Grains.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.Orleans.Templates.Grains.1.1.2\build\Microsoft.Orleans.Templates.Grains.props'))" />
-    <Error Condition="!Exists('..\packages\Microsoft.Orleans.Templates.Grains.1.1.2\build\Microsoft.Orleans.Templates.Grains.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.Orleans.Templates.Grains.1.1.2\build\Microsoft.Orleans.Templates.Grains.targets'))" />
-  </Target>
-  <Import Project="..\packages\Microsoft.Orleans.Templates.Interfaces.1.1.2\build\Microsoft.Orleans.Templates.Interfaces.targets" Condition="Exists('..\packages\Microsoft.Orleans.Templates.Interfaces.1.1.2\build\Microsoft.Orleans.Templates.Interfaces.targets')" />
-  <Import Project="..\packages\Microsoft.Orleans.Templates.Grains.1.1.2\build\Microsoft.Orleans.Templates.Grains.targets" Condition="Exists('..\packages\Microsoft.Orleans.Templates.Grains.1.1.2\build\Microsoft.Orleans.Templates.Grains.targets')" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">
