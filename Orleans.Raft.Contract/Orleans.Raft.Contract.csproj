@@ -56,7 +56,7 @@
   <ItemGroup>
     <Compile Include="IRaftGrain.cs" />
     <Compile Include="ITestRaftGrain.cs" />
-    <Compile Include="Log\Log.cs" />
+    <Compile Include="Log\InMemoryLog.cs" />
     <Compile Include="Log\LogEntry.cs" />
     <Compile Include="Log\LogEntryId.cs" />
     <Compile Include="Messages\AppendRequest.cs" />

@@ -6,7 +6,7 @@ namespace Orleans.Raft.Contract.Log
     using System.Threading.Tasks;
 
     [Serializable]
-    public class Log<TOperation>
+    public class InMemoryLog<TOperation>
     {
         public List<LogEntry<TOperation>> Entries { get; set; } = new List<LogEntry<TOperation>>();
 
@@ -75,7 +75,7 @@ namespace Orleans.Raft.Contract.Log
             if (logEntry.Id.Index > this.LastLogIndex + 1)
             {
                 throw new InvalidOperationException(
-                    $"Cannot append entry {logEntry.Id} because next index is {this.LastLogIndex + 1}");
+                    $"Cannot append entry {logEntry.Id} because it is greater than the next index, {this.LastLogIndex + 1}.");
             }
 
             if (logEntry.Id.Index == this.LastLogIndex + 1)

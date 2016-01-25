@@ -33,7 +33,7 @@ namespace OrleansRaft.Actors
 
     public interface IHasLog<TOperation>
     {
-        Log<TOperation> Log { get; }
+        InMemoryLog<TOperation> Log { get; }
     }
 
     public interface IRaftServerState<TOperation> : IRaftVolatileState, IRaftPersistentState, IHasLog<TOperation>
@@ -161,7 +161,7 @@ namespace OrleansRaft.Actors
             return this.WriteStateAsync();
         }
 
-        public Log<TOperation> Log { get; } = new Log<TOperation>();
+        public InMemoryLog<TOperation> Log { get; } = new InMemoryLog<TOperation>();
 
 
         private void LogInfo(string message)
