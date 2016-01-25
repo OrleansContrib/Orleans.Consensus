@@ -216,20 +216,41 @@ namespace OrleansRaft.Actors
 
             private Task UpdateCommittedIndex()
             {
-                for (var index = this.self.Log.LastLogIndex; index > this.self.CommitIndex; index--)
+                foreach (var entry in this.self.Log.Reverse())
                 {
-                    var votes = 0;
-                    foreach (var server in this.servers)
+                    if (entry.Id.Term != this.self.CurrentTerm)
                     {
-                        if (server.Value.MatchIndex >= index)
-                        {
-                            votes++;
-                        }
+                        // Only log entries from the leader’s current term are committed by counting replicas. See §5.4.2.
+                        return Task.FromResult(0);
                     }
 
-                    if (votes >= this.QuorumSize)
+                    // Return if the log entry is already committed.
+                    if (entry.Id.Index == this.self.CommitIndex)
                     {
-                        this.self.LogInfo($"Recently committed entries from {this.self.CommitIndex + 1} to {index}.");
+                        return Task.FromResult(0);
+                    }
+                    
+                    var index = entry.Id.Index;
+                    var replicas = 0;
+                    foreach (var server in this.servers)
+                    {
+                        // If the server is not known to have this log entry, continue to the next server.
+                        if (server.Value.MatchIndex < index)
+                        {
+                            continue;
+                        }
+
+                        replicas++;
+
+                        // If a quorum has not yet been reached, continue to the next server.
+                        if (replicas < this.QuorumSize)
+                        {
+                            continue;
+                        }
+
+                        // This entry is committed.
+                        this.self.LogInfo(
+                            $"Recently committed entries from {this.self.CommitIndex} to {index} with {replicas + 1}/{this.servers.Count + 1} replicas.");
                         this.self.CommitIndex = index;
                         return this.self.ApplyRemainingCommittedEntries();
                     }

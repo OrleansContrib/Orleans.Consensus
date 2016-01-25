@@ -2,12 +2,15 @@ namespace Orleans.Raft.Contract.Log
 {
     using System;
     using System.Collections.Generic;
+    using System.Linq;
     using System.Threading.Tasks;
 
     [Serializable]
     public class Log<TOperation>
     {
         public List<LogEntry<TOperation>> Entries { get; set; } = new List<LogEntry<TOperation>>();
+
+        public IEnumerable<LogEntry<TOperation>> Reverse() => Enumerable.Reverse(this.Entries);
 
         public long LastLogIndex => this.Entries.Count;
 
