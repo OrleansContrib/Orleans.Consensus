@@ -18,8 +18,8 @@ namespace TestConsole
     using System.Net;
 
     using Orleans;
-    using Orleans.Raft.Contract;
-    using Orleans.Raft.Contract.Messages;
+    using Orleans.Consensus.Contract;
+    using Orleans.Consensus.Contract.Messages;
     using Orleans.Runtime;
     using Orleans.Runtime.Configuration;
     using Orleans.Storage;

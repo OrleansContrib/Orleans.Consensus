@@ -1,8 +1,9 @@
-# Orleans.Raft
+# Orleans.Consensus
 
-Raft implementation using [Orleans](https://github.com/dotnet/orleans).
+A library for creating fault-tolerant, strong-consistency, persistent services with [Orleans](https://github.com/dotnet/orleans).
+Orleans.Consensus implements a replicated log using the [Raft](https://raft.github.io/) consensus algorithm, allowing consumers to turn single-node services into distributed services.
 
-> Incomplete proof-of-concept
+> Note that that grandiose statement above is a lie and this is an incomplete proof-of-concept which you should not use for mission-critical workloads (or any workloads) :)
 
 ## Usage
 
@@ -10,6 +11,8 @@ Open project in VS, hit F5, watch the debug output.
 
 ## TODO
 
+* Extract interfaces for the concrete classes and clean them up.
+* Autofac for dependency injection to make the system more testable.
 * Extensive automated testing.
 * Use Orleans to provide cluster membership.
 * Implement Joint-Consensus for cluster membership change from the Raft paper.
