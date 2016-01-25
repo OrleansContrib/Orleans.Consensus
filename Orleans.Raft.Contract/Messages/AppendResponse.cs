@@ -2,6 +2,9 @@ namespace Orleans.Raft.Contract.Messages
 {
     using System;
 
+    using Orleans.Concurrency;
+
+    [Immutable]
     [Serializable]
     public class AppendResponse : IMessage
     {

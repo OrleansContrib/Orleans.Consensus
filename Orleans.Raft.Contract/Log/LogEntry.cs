@@ -2,6 +2,9 @@ namespace Orleans.Raft.Contract.Log
 {
     using System;
 
+    using Orleans.Concurrency;
+
+    [Immutable]
     [Serializable]
     public struct LogEntry<TOperation>
     {

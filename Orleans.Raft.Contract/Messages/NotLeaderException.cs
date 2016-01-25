@@ -3,6 +3,9 @@ namespace Orleans.Raft.Contract.Messages
     using System;
     using System.Runtime.Serialization;
 
+    using Orleans.Concurrency;
+
+    [Immutable]
     [Serializable]
     public class NotLeaderException : Exception
     {

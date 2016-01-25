@@ -3,8 +3,10 @@
     using System;
     using System.Collections.Generic;
 
+    using Orleans.Concurrency;
     using Orleans.Raft.Contract.Log;
 
+    [Immutable]
     [Serializable]
     public class AppendRequest<TOperation> : IMessage
     {

@@ -181,7 +181,7 @@ namespace OrleansRaft.Actors
 
         private string GetLogMessage(string message)
         {
-            return $"[{this.messageHandler.State} CurrTerm: {this.State.CurrentTerm}, LastLog: ({this.Log.LastLogEntryId})] {message}";
+            return $"[{this.messageHandler.State} in term {this.State.CurrentTerm}, LastLog: ({this.Log.LastLogEntryId})] {message}";
         }
     }
 }

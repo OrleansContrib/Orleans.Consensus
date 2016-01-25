@@ -2,6 +2,9 @@ namespace Orleans.Raft.Contract.Log
 {
     using System;
 
+    using Orleans.Concurrency;
+
+    [Immutable]
     public struct LogEntryId : IEquatable<LogEntryId>
     {
         public LogEntryId(long term, long index)
@@ -13,7 +16,7 @@ namespace Orleans.Raft.Contract.Log
         public long Term { get; }
         public long Index { get; }
 
-        public override string ToString() => $"Term: {this.Term}, Index: {this.Index}";
+        public override string ToString() => $"{this.Term}.{this.Index}";
 
         /// <summary>
         /// Indicates whether the current object is equal to another object of the same type.
