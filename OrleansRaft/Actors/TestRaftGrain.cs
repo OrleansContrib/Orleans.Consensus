@@ -4,11 +4,14 @@ namespace OrleansRaft.Actors
     using System.Text;
     using System.Threading.Tasks;
 
+    using Orleans;
     using Orleans.Raft.Contract;
     using Orleans.Raft.Contract.Log;
+    using Orleans.Runtime;
 
     public class TestRaftGrain : RaftGrain<string>, ITestRaftGrain
     {
+        private Logger log;
         public TestRaftGrain()
         {
             this.StateMachine = new BigString();
@@ -21,24 +24,29 @@ namespace OrleansRaft.Actors
         /// </summary>
         public override async Task OnActivateAsync()
         {
+            this.log = this.GetLogger($"TEST {this.GetPrimaryKeyString()}");
             await base.OnActivateAsync();
         }
 
         public Task AddValue(string value)
         {
+            this.log.Error(0, $"TEST: AddValue({value})");
             if (string.IsNullOrEmpty(value)) return Task.FromResult(0);
             return this.AppendEntry(value);
         }
 
         public Task Crash()
         {
+            this.log.Error(0, "TEST: Crash()");
             this.DeactivateOnIdle();
             return Task.FromResult(0);
         }
 
-        public Task Delay(TimeSpan delay)
+        public async Task Delay(TimeSpan delay)
         {
-            return Task.Delay(delay);
+            this.log.Error(0, "TEST: Stall");
+            await Task.Delay(delay);
+            this.log.Error(0, "TEST: Stopped stalling");
         }
 
         public Task<string> GetState()

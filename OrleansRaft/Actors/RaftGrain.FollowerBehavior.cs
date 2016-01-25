@@ -4,11 +4,11 @@ using System.Threading.Tasks;
 
 namespace OrleansRaft.Actors
 {
-    using Newtonsoft.Json;
+    using System.Linq;
 
     using Orleans.Raft.Contract.Messages;
 
-    public abstract  partial class RaftGrain<TOperation>
+    public abstract partial class RaftGrain<TOperation>
     {
         internal class FollowerBehavior : IRaftMessageHandler<TOperation>
         {
@@ -34,7 +34,13 @@ namespace OrleansRaft.Actors
                 this.messagesSinceLastElectionExpiry = 1;
                 await this.UpdateTerm();
                 await this.ElectionTimerExpired();
+
+                if (Settings.ApplyEntriesOnFollowers && this.self.StateMachine!=null)
+                {
+                    await this.self.StateMachine.Reset();
+                }
             }
+
             public Task ReplicateAndApplyEntries(List<TOperation> entries)
             {
                 throw new NotLeaderException(this.self.LeaderId);
@@ -50,9 +56,7 @@ namespace OrleansRaft.Actors
 
                 if (this.self.State.CurrentTerm != this.term)
                 {
-                    this.self.State.CurrentTerm = this.term;
-                    this.self.State.VotedFor = null;
-                    return this.self.WriteStateAsync();
+                    return this.self.UpdateTermAndVote(null, this.term);
                 }
 
                 return Task.FromResult(0);
@@ -72,7 +76,9 @@ namespace OrleansRaft.Actors
                 this.messagesSinceLastElectionExpiry = 0;
                 var randomTimeout =
                     TimeSpan.FromMilliseconds(
-                        this.self.random.Next(Settings.MinElectionTimeoutMilliseconds, Settings.MaxElectionTimeoutMilliseconds));
+                        this.self.GetNextRandom(
+                            Settings.MinElectionTimeoutMilliseconds,
+                            Settings.MaxElectionTimeoutMilliseconds));
                 this.electionTimer?.Dispose();
                 this.electionTimer = this.self.RegisterTimer(
                     _ => this.ElectionTimerExpired(),
@@ -94,61 +100,89 @@ namespace OrleansRaft.Actors
             {
                 bool voteGranted;
 
+                this.self.LogInfo($"RequestVote: {request}");
+
                 // 1. Reply false if term < currentTerm(§5.1)
                 if (request.Term < this.self.State.CurrentTerm)
                 {
-                    this.self.LogWarn($"Denying vote request from {request.Candidate} in old term, {request.Term}, and last log {request.LastLogEntryId}.");
+                    this.self.LogWarn($"Denying vote {request}. Requested term is older than current term.");
                     voteGranted = false;
                 }
                 // 2. If votedFor is null or candidateId, and candidate’s log is at least as up-to-date as receiver’s
                 // log, grant vote (§5.2, §5.4)
-                else if ((string.IsNullOrEmpty(this.self.State.VotedFor)
-                          || string.Equals(this.self.State.VotedFor, request.Candidate, StringComparison.Ordinal))
-                         && request.LastLogEntryId >= this.self.Log.LastLogEntryId)
-                {
-                    this.self.LogInfo($"Granting vote to {request.Candidate} with last log: {request.LastLogEntryId}.");
-                    this.messagesSinceLastElectionExpiry++;
-
-                    voteGranted = true;
-
-                    // Record that the vote is being granted.
-                    this.self.State.CurrentTerm = request.Term;
-                    this.self.State.VotedFor = request.Candidate;
-                    await this.self.WriteStateAsync();
-                }
                 else
                 {
-                    this.self.LogWarn(
-                        $"Denying vote request from {request.Candidate} in term {request.Term}, with last log {request.LastLogEntryId}.");
-                    voteGranted = false;
+                    // Check if this server has already voted for another server in the current term.
+                    var votedInCurrentTerm = request.Term == this.self.State.CurrentTerm
+                                             && !string.IsNullOrEmpty(this.self.State.VotedFor);
+                    var votedForAnotherServerInCurrentTerm = votedInCurrentTerm
+                                                             && !string.Equals(
+                                                                 this.self.State.VotedFor,
+                                                                 request.Candidate,
+                                                                 StringComparison.Ordinal);
+
+                    if (votedForAnotherServerInCurrentTerm)
+                    {
+                        this.self.LogWarn($"Denying vote {request}: Already voted for {this.self.State.VotedFor}");
+                        voteGranted = false;
+                    }
+                    else if (this.self.Log.LastLogEntryId > request.LastLogEntryId)
+                    {
+                        this.self.LogWarn(
+                            $"Denying vote {request}: Local log is more up-to-date than candidate's log. "
+                            + $"{this.self.Log.LastLogEntryId} > {request.LastLogEntryId}");
+                        voteGranted = false;
+                    }
+                    else
+                    {
+                        this.self.LogInfo(
+                            $"Granting vote to {request.Candidate} with last log: {request.LastLogEntryId}.");
+                        this.messagesSinceLastElectionExpiry++;
+
+                        voteGranted = true;
+
+                        // Record that the vote is being granted.
+                        await this.self.UpdateTermAndVote(request.Candidate, request.Term);
+                    }
                 }
 
-                return new RequestVoteResponse { VoteGranted = voteGranted, Term = this.self.State.CurrentTerm };
+                return new RequestVoteResponse { VoteGranted = voteGranted, Term = this.self.CurrentTerm };
             }
 
             public async Task<AppendResponse> Append(AppendRequest<TOperation> request)
             {
                 bool success;
 
-                // 1. Reply false if term < currentTerm (§5.1)
-                if (request.Term < this.self.State.CurrentTerm)
+                // If the request has a higher term than this follower, persist the updated term.
+                if (request.Term > this.self.CurrentTerm)
                 {
-                    this.self.LogWarn($"Denying append request from {request.Leader} in old term, {request.Term}, and last log {request.PreviousLogEntry}.");
+                    await this.self.UpdateTermAndVote(null, this.self.CurrentTerm);
+                }
+
+                // 1. Reply false if term < currentTerm (§5.1)
+                if (request.Term < this.self.CurrentTerm)
+                {
+                    this.self.LogWarn(
+                        $"Denying append {request}: Term is older than current term, {this.self.CurrentTerm}.");
                     success = false;
                 }
                 // 2. Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
                 else if (!this.self.Log.Contains(request.PreviousLogEntry))
                 {
+                    this.messagesSinceLastElectionExpiry++;
                     this.self.LogWarn(
-                        $"Denying append from {request.Leader} since local log does not contain previous entry {request.PreviousLogEntry}: {JsonConvert.SerializeObject(this.self.Log.Entries, Formatting.Indented)}");
+                        $"Denying append {request}: Local log does not contain previous entry. "
+                        + $"Local: [{string.Join(", ", this.self.Log.Entries.Select(_ => _.Id))}]");
                     success = false;
                 }
                 // 3. If an existing entry conflicts with a new one (same index but different terms),
                 // delete the existing entry and all that follow it (§5.3)
                 else if (this.self.Log.ConflictsWith(request.PreviousLogEntry))
                 {
+                    this.messagesSinceLastElectionExpiry++;
                     this.self.LogWarn(
-                        $"Denying append request from {request.Leader} because previous log entry {request.PreviousLogEntry} conflicts with local log: {JsonConvert.SerializeObject(this.self.Log.Entries, Formatting.Indented)}");
+                        $"Denying append {request}: Previous log entry {request.PreviousLogEntry} conflicts with "
+                        + $"local log: [{string.Join(", ", this.self.Log.Entries.Select(_ => _.Id))}]");
                     success = false;
                 }
                 else
@@ -165,29 +199,36 @@ namespace OrleansRaft.Actors
                     }
                     else
                     {
-                        this.self.LogInfo($"Accepting append (prev entry: {request.PreviousLogEntry})");
                         foreach (var entry in request.Entries)
                         {
                             // TODO: batch writes.
                             await this.self.Log.AppendOrOverwrite(entry);
                         }
+                        this.self.LogInfo(
+                            $"Accepted append. Log is now: [{string.Join(", ", this.self.Log.Entries.Select(_ => _.Id))}]");
                     }
 
                     // 5. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry).
                     if (request.LeaderCommitIndex > this.self.CommitIndex)
                     {
                         this.self.CommitIndex = Math.Min(request.LeaderCommitIndex, this.self.Log.LastLogIndex);
-
-                        this.self.LogInfo($"Committed up to index {this.self.CommitIndex}.");
-
-                        // If commitIndex > lastApplied: increment lastApplied, apply log[lastApplied] to state machine(§5.3)
-                        await this.self.ApplyRemainingCommittedEntries();
+                        
+                        if (Settings.ApplyEntriesOnFollowers)
+                        {
+                            // If commitIndex > lastApplied: increment lastApplied, apply log[lastApplied] to state machine(§5.3)
+                            await this.self.ApplyRemainingCommittedEntries();
+                        }
                     }
 
                     success = true;
                 }
 
-                return new AppendResponse { Success = success, Term = this.self.State.CurrentTerm };
+                return new AppendResponse
+                {
+                    Success = success,
+                    Term = this.self.CurrentTerm,
+                    LastLogEntryId = this.self.Log.LastLogEntryId
+                };
             }
         }
     }

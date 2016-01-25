@@ -8,6 +8,9 @@ namespace Orleans.Raft.Contract.Log
     [Serializable]
     public class InMemoryLog<TOperation>
     {
+        [NonSerialized]
+        private Func<Task> writeCallback;
+
         public List<LogEntry<TOperation>> Entries { get; set; } = new List<LogEntry<TOperation>>();
 
         public IEnumerable<LogEntry<TOperation>> Reverse() => Enumerable.Reverse(this.Entries);
@@ -87,7 +90,19 @@ namespace Orleans.Raft.Contract.Log
                 this.Entries[(int)logEntry.Id.Index - 1] = logEntry;
             }
 
-            return Task.FromResult(0);
+            return this.WriteCallback?.Invoke() ?? Task.FromResult(0);
+        }
+
+        public Func<Task> WriteCallback
+        {
+            get
+            {
+                return this.writeCallback;
+            }
+            set
+            {
+                this.writeCallback = value;
+            }
         }
     }
 }

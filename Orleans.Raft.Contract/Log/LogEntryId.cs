@@ -76,6 +76,7 @@ namespace Orleans.Raft.Contract.Log
             {
                 return true;
             }
+
             if (left.Term < right.Term)
             {
                 return false;
@@ -90,6 +91,7 @@ namespace Orleans.Raft.Contract.Log
             {
                 return true;
             }
+
             if (left.Term > right.Term)
             {
                 return false;

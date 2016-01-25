@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace OrleansRaft.Actors
 {
-    using Newtonsoft.Json;
+    using System.Diagnostics;
 
     using Orleans;
     using Orleans.Raft.Contract;
@@ -16,30 +16,31 @@ namespace OrleansRaft.Actors
     {
         internal class LeaderBehavior : IRaftMessageHandler<TOperation>
         {
+            private readonly Stopwatch callTimer = new Stopwatch();
             private readonly TimeSpan heartbeatTimeout = TimeSpan.FromMilliseconds(Settings.HeartbeatTimeoutMilliseconds);
 
             private readonly RaftGrain<TOperation> self;
 
-            private readonly Dictionary<string, ServerState> servers = new Dictionary<string, ServerState>();
+            private readonly Dictionary<string, FollowerProgress> servers = new Dictionary<string, FollowerProgress>();
 
             private IDisposable heartbeatTimer;
 
             private DateTime lastMessageSentTime;
 
-            public LeaderBehavior(RaftGrain<TOperation> self, IEnumerable<string> servers)
+            public LeaderBehavior(RaftGrain<TOperation> self)
             {
                 this.self = self;
 
                 // Initialize volatile state on leader.
-                foreach (var server in servers)
+                foreach (var server in this.self.OtherServers)
                 {
-                    this.servers[server] = new ServerState { NextIndex = self.Log.LastLogIndex + 1, MatchIndex = 0 };
+                    this.servers[server] = new FollowerProgress { NextIndex = self.Log.LastLogIndex + 1, MatchIndex = 0 };
                 }
             }
 
             public string State => "Leader";
 
-            public Task Enter()
+            public async Task Enter()
             {
                 this.self.LogInfo("Becoming leader.");
 
@@ -55,7 +56,10 @@ namespace OrleansRaft.Actors
                     TimeSpan.Zero,
                     this.heartbeatTimeout);
 
-                return Task.FromResult(0);
+                if (this.self.StateMachine != null)
+                {
+                    await this.self.StateMachine.Reset();
+                }
             }
 
             public Task SendHeartBeats()
@@ -111,30 +115,28 @@ namespace OrleansRaft.Actors
                 return new AppendResponse { Success = false, Term = this.self.State.CurrentTerm };
             }
 
-
-            public Task ReplicateAndApplyEntries(List<TOperation> entries)
+            public async Task ReplicateAndApplyEntries(List<TOperation> entries)
             {
                 if (entries?.Count > 0)
                 {
-                    this.self.LogInfo($"Sending {entries.Count} entries to {this.servers.Count} servers");
-                }
-                else
-                {
-                    //this.self.LogInfo("heartbeat");
+                    this.self.LogInfo($"Replicating {entries.Count} entries to {this.servers.Count} servers");
                 }
 
                 var log = this.self.Log;
-                if (entries != null)
+                if (entries != null && entries.Count > 0)
                 {
                     foreach (var entry in entries)
                     {
-                        log.AppendOrOverwrite(
+                        await log.AppendOrOverwrite(
                             new LogEntry<TOperation>(
                                 new LogEntryId(this.self.State.CurrentTerm, log.LastLogIndex + 1),
                                 entry));
                     }
+
+                    this.self.LogInfo($"Leader log is: [{string.Join(", ", this.self.Log.Entries.Select(_ => _.Id))}]");
                 }
 
+                var tasks = new List<Task>(this.servers.Count);
                 foreach (var server in this.servers)
                 {
                     if (string.Equals(this.self.Id, server.Key, StringComparison.Ordinal))
@@ -142,13 +144,30 @@ namespace OrleansRaft.Actors
                         continue;
                     }
 
-                    var nextIndex = server.Value.NextIndex;
+                    tasks.Add(this.AppendEntriesOnServer(server.Key, server.Value));
+                }
+
+                // TODO: return a task which completes when the operation is committed.
+                await Task.WhenAll(tasks);
+            }
+
+            private async Task AppendEntriesOnServer(string serverId, FollowerProgress followerProgress)
+            {
+                this.callTimer.Restart();
+                var serverGrain = this.self.GrainFactory.GetGrain<IRaftGrain<TOperation>>(serverId);
+                var log = this.self.Log;
+                while (true)
+                {
+                    var nextIndex = followerProgress.NextIndex;
                     var request = new AppendRequest<TOperation>
                     {
                         Leader = this.self.Id,
                         LeaderCommitIndex = this.self.CommitIndex,
                         Term = this.self.State.CurrentTerm,
-                        Entries = log.Entries.Skip((int)Math.Max(0, nextIndex - 1)).Take(Settings.MaxLogEntriesPerAppendRequest).ToList()
+                        Entries =
+                            log.Entries.Skip((int)Math.Max(0, nextIndex - 1))
+                                .Take(Settings.MaxLogEntriesPerAppendRequest)
+                                .ToList()
                     };
 
                     if (nextIndex >= 2 && log.Entries.Count > nextIndex - 2)
@@ -157,61 +176,69 @@ namespace OrleansRaft.Actors
                     }
 
                     this.lastMessageSentTime = DateTime.UtcNow;
-                    if (entries?.Count > 0)
+                    if (request.Entries.Count > 0)
                     {
                         this.self.LogInfo(
-                            $"Replicating to '{server.Key}': {JsonConvert.SerializeObject(request, Formatting.Indented)}");
+                            $"Replicating to '{serverId}': prev: {request.PreviousLogEntry},"
+                            + $" entries: [{string.Join(", ", request.Entries.Select(_ => _.Id))}]"
+                            + $", next: {nextIndex}, match: {followerProgress.MatchIndex}");
                     }
 
-                    this.self.GrainFactory.GetGrain<IRaftGrain<TOperation>>(server.Key)
-                        .Append(request)
-                        .ContinueWith(
-                            async responseTask =>
-                            {
-                                // Only process messages which ran to completion.
-                                if (responseTask.Status == TaskStatus.RanToCompletion)
-                                {
-                                    var response = responseTask.GetAwaiter().GetResult();
-                                    if (response.Success)
-                                    {
-                                        // The follower's log matches the included logs.
-                                        var newMatchIndex = Math.Max(
-                                            server.Value.MatchIndex,
-                                            request.PreviousLogEntry.Index + (request.Entries?.Count ?? 0));
-                                        if (newMatchIndex != server.Value.MatchIndex)
-                                        {
-                                            this.self.LogInfo(
-                                                $"Successfully appended entries {request.PreviousLogEntry.Index + 1} to {newMatchIndex} on {server.Key}");
-                                            /*this.self.LogInfo(
-                                                $"Updating MatchIndex of {server.Key} from {server.Value.MatchIndex} to {newMatchIndex}");*/
-                                            server.Value.MatchIndex = newMatchIndex;
+                    var response = await serverGrain.Append(request);
+                    if (response.Success)
+                    {
+                        // The follower's log matches the included logs.
+                        var newMatchIndex = Math.Max(
+                            followerProgress.MatchIndex,
+                            (long)request.Entries?.LastOrDefault().Id.Index);
 
-                                            // The send was successful, so the next entry to send is the subsequent entry in the leader's log.
-                                            server.Value.NextIndex = newMatchIndex + 1;
+                        // The send was successful, so the next entry to send is the subsequent entry in the leader's log.
+                        followerProgress.NextIndex = newMatchIndex + 1;
 
-                                            await this.UpdateCommittedIndex();
-                                        }
-                                    }
-                                    else
-                                    {
-                                        this.self.LogWarn($"Received failure response for append call with term of {response.Term}");
-                                        if (await this.self.StepDownIfGreaterTerm(response))
-                                        {
-                                            // This node is no longer a leader, so retire.
-                                            return;
-                                        }
+                        // For efficiency, only consider updating the committedIndex if matchIndex has changed.
+                        if (newMatchIndex != followerProgress.MatchIndex)
+                        {
+                            this.self.LogInfo(
+                                $"Successfully appended entries {request.Entries?.FirstOrDefault().Id} to {newMatchIndex} on {serverId}");
+                            followerProgress.MatchIndex = newMatchIndex;
 
-                                        // Log mismatch, decrement and try again later.
-                                        // TODO: This should try again immediately.
-                                        var next = server.Value.NextIndex--;
-                                        this.self.LogWarn($"Log mismatch must have occured on '{server.Key}', decrementing nextIndex to {next}.");
-                                    }
-                                }
-                            }).Ignore();
+                            await this.UpdateCommittedIndex();
+                        }
+
+                        return;
+                    }
+
+                    this.self.LogWarn($"Received failure response for append call with term of {response.Term}");
+                    if (await this.self.StepDownIfGreaterTerm(response))
+                    {
+                        // This node is no longer a leader, so retire.
+                        return;
+                    }
+
+                    if (followerProgress.NextIndex > response.LastLogEntryId.Index)
+                    {
+                        // If the follower is lagging, jump immediately to its last log entry.
+                        followerProgress.NextIndex = response.LastLogEntryId.Index;
+                        this.self.LogInfo($"Follower's last log is {response.LastLogEntryId}, jumping nextIndex to that index.");
+                    }
+                    else
+                    {
+                        // Log mismatch, decrement and try again later.
+                        --followerProgress.NextIndex;
+                        this.self.LogWarn(
+                            $"Log mismatch must have occured on '{serverId}', decrementing nextIndex to {followerProgress.NextIndex}.");
+                    }
+                    
+                    // In an attempt to maintain fairness and retain leader status, bail out of catchup if the call has taken
+                    // more than the allotted time.
+                    if (this.callTimer.ElapsedMilliseconds
+                        >= Settings.HeartbeatTimeoutMilliseconds / this.self.OtherServers.Count)
+                    {
+                        this.self.LogInfo(
+                            $"Bailing on '{serverId}' catch-up due to fairness. Elapsed: {this.callTimer.ElapsedMilliseconds}.");
+                        break;
+                    }
                 }
-
-                // TODO: return a task which completes when the operation is committed.
-                return Task.FromResult(0);
             }
 
             private Task UpdateCommittedIndex()
@@ -261,7 +288,7 @@ namespace OrleansRaft.Actors
 
             private int QuorumSize => (this.servers.Count + 1) / 2;
 
-            internal class ServerState
+            internal class FollowerProgress
             {
                 public long NextIndex { get; set; }
                 public long MatchIndex { get; set; }

@@ -33,72 +33,67 @@ namespace OrleansRaft.Actors
                 this.self.LeaderId = null;
 
                 // Increment currentTerm and vote for self.
-                this.self.State.CurrentTerm = this.self.State.CurrentTerm + 1;
-                this.self.State.VotedFor = this.self.Id;
-                await this.self.WriteStateAsync();
+                await this.self.UpdateTermAndVote(this.self.Id, this.self.CurrentTerm + 1);
 
                 // Reset election timer.
                 var randomTimeout =
                     TimeSpan.FromMilliseconds(
-                        this.self.random.Next(Settings.MinElectionTimeoutMilliseconds, Settings.MaxElectionTimeoutMilliseconds));
+                        this.self.GetNextRandom(Settings.MinElectionTimeoutMilliseconds, Settings.MaxElectionTimeoutMilliseconds));
                 this.electionTimer?.Dispose();
                 this.electionTimer = this.self.RegisterTimer(
                     _ => this.self.BecomeCandidate(),
                     null,
                     randomTimeout,
-                    TimeSpan.MaxValue);
+                    randomTimeout);
 
                 // Send RequestVote RPCs to all other servers.
-                var request = new RequestVoteRequest
+                var request = new RequestVoteRequest(
+                    this.self.State.CurrentTerm,
+                    this.self.Id,
+                    this.self.Log.LastLogEntryId);
+                var responses = new List<Task<RequestVoteResponse>>();
+                foreach (var server in this.self.OtherServers)
                 {
-                    Candidate = this.self.Id,
-                    LastLogEntryId = this.self.Log.LastLogEntryId,
-                    Term = this.self.State.CurrentTerm
-                };
-                foreach (var server in this.self.servers)
-                {
-                    if (string.Equals(this.self.Id, server, StringComparison.Ordinal))
-                    {
-                        continue;
-                    }
-
                     var serverGrain = this.self.GrainFactory.GetGrain<IRaftGrain<TOperation>>(server);
-                    serverGrain.RequestVote(request).ContinueWith(this.CountVotes).Ignore();
+                    responses.Add(serverGrain.RequestVote(request));
                 }
-            }
 
-            private async Task CountVotes(Task<RequestVoteResponse> responseTask)
-            {
-                if (responseTask.Status == TaskStatus.RanToCompletion)
+                // Count the votes.
+                foreach (var responseTask in responses)
                 {
-                    var response = responseTask.GetAwaiter().GetResult();
-                    if (response.VoteGranted)
+                    try
                     {
-                        // Safety check.
-                        if (response.Term > this.self.State.CurrentTerm)
+                        // TODO: waiting on all tasks in sequence means we are affected by slow servers.
+                        var response = await responseTask;
+                        if (await this.self.StepDownIfGreaterTerm(response))
                         {
-                            throw new InvalidOperationException(
-                                $"Received vote from follower in a greater term, {response.Term}, to the current term, {this.self.State.CurrentTerm}");
+                            return;
+                        }
+
+                        if (!response.VoteGranted)
+                        {
+                            continue;
                         }
 
                         this.votes++;
                         this.self.LogInfo($"Received {this.votes} votes as candidate for term {this.self.State.CurrentTerm}.");
 
                         // If votes received from majority of servers: become leader (§5.2)
-                        if (this.votes > this.self.servers.Count / 2)
+                        if (this.votes > this.self.OtherServers.Count / 2)
                         {
                             this.self.LogInfo(
-                                $"Becoming leader for term {this.self.State.CurrentTerm} with {this.votes} votes from {this.self.servers.Count} total servers.");
+                                $"Becoming leader for term {this.self.State.CurrentTerm} with {this.votes}/{this.self.OtherServers.Count + 1} votes.");
                             await this.self.BecomeLeader();
+                            return;
                         }
                     }
-                    else
+                    catch (Exception exception)
                     {
-                        await this.self.StepDownIfGreaterTerm(response);
+                        this.self.LogWarn($"Exception from {nameof(this.RequestVote)}: {exception}");
                     }
                 }
             }
-
+            
             public Task Exit()
             {
                 this.self.LogInfo("Leaving candidate state.");

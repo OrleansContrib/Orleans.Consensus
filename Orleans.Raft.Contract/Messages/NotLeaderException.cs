@@ -46,7 +46,7 @@ namespace Orleans.Raft.Contract.Messages
         protected NotLeaderException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
-            info.GetString(nameof(this.Leader));
+            this.Leader = info.GetString(nameof(this.Leader));
         }
     }
 }

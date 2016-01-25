@@ -26,7 +26,7 @@ namespace Orleans.Raft.Contract.Log
         /// </returns>
         public override string ToString()
         {
-            return $"Id: {this.Id}, Operation: {this.Operation}";
+            return $"Entry({this.Id}, Op: {this.Operation})";
         }
     }
 }
