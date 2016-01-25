@@ -34,6 +34,7 @@ namespace TestConsole
             InitializeComponent();
             var config = GetClusterConfiguration();
 
+            this.Leader.Text = "one";
             while (true)
             {
                 try
@@ -90,22 +91,35 @@ namespace TestConsole
 
             return config;
         }
-
-        private string leader = "one";
+        
         private async void Client_AppendText(object sender, RoutedEventArgs e)
         {
+            NotLeaderException notLeaderException = null;
             try
             {
-                var grain = GrainClient.GrainFactory.GetGrain<ITestRaftGrain>(leader);
+                var grain = GrainClient.GrainFactory.GetGrain<ITestRaftGrain>(this.Leader.Text);
                 await grain.AddValue(this.AppendText.Text);
+            }
+            catch (AggregateException aggregateException)
+            {
+                aggregateException.Flatten();
+                notLeaderException = aggregateException.InnerException as NotLeaderException;
             }
             catch (NotLeaderException exception)
             {
-                if (!string.IsNullOrWhiteSpace(exception.Leader))
+                notLeaderException = exception;
+            }
+            catch {}
+
+
+            if (notLeaderException != null)
+            {
+                if (!string.IsNullOrWhiteSpace(notLeaderException.Leader))
                 {
-                    this.leader = exception.Leader;
+                    this.Leader.Text = notLeaderException.Leader;
                 }
-            }catch { }
+            }
+
         }
     }
 }

@@ -59,7 +59,7 @@
                     <RowDefinition />
                 </Grid.RowDefinitions>
                 <TextBlock >Current Leader:</TextBlock>
-                <TextBlock Grid.Row="1" x:Name="Leader"></TextBlock>
+                <TextBox Grid.Row="1" x:Name="Leader"></TextBox>
             </Grid>
             <Grid Grid.Column="1">
                 <Grid.RowDefinitions>
