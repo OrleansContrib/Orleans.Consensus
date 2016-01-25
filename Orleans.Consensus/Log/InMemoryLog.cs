@@ -1,21 +1,29 @@
-namespace Orleans.Consensus.Contract.Log
+namespace Orleans.Consensus.Log
 {
     using System;
     using System.Collections.Generic;
     using System.Linq;
     using System.Threading.Tasks;
 
+    using Orleans.Consensus.Contract.Log;
+
+    public static class PersistentLogExtensions
+    {
+        public static string ProgressString<TOperation>(this IPersistentLog<TOperation> log)
+        {
+            return $"[{string.Join(", ", log.GetCursor(0).Select(_ => _.Id))}]";
+        }
+    }
+
     [Serializable]
-    public class InMemoryLog<TOperation>
+    public class InMemoryLog<TOperation> : IPersistentLog<TOperation>
     {
         [NonSerialized]
         private Func<Task> writeCallback;
 
-        public List<LogEntry<TOperation>> Entries { get; set; } = new List<LogEntry<TOperation>>();
+        internal List<LogEntry<TOperation>> Entries { get; } = new List<LogEntry<TOperation>>();
 
-        public IEnumerable<LogEntry<TOperation>> Reverse() => Enumerable.Reverse(this.Entries);
-
-        public long LastLogIndex => this.Entries.Count;
+        public IEnumerable<LogEntry<TOperation>> GetReverseCursor() => Enumerable.Reverse(this.Entries);
 
         public LogEntryId LastLogEntryId
         {
@@ -23,11 +31,21 @@ namespace Orleans.Consensus.Contract.Log
             {
                 if (this.Entries.Count > 0)
                 {
-                    return this.Entries[(int)this.LastLogIndex - 1].Id;
+                    return this.Entries[this.Entries.Count - 1].Id;
                 }
 
                 return default(LogEntryId);
             }
+        }
+
+        public LogEntry<TOperation> Get(long index)
+        {
+            return this.Entries[(int)index - 1];
+        }
+
+        public IEnumerable<LogEntry<TOperation>> GetCursor(long fromIndex)
+        {
+            return this.Entries.Skip((int)fromIndex);
         }
 
         public bool Contains(LogEntryId entryId)
@@ -59,7 +77,7 @@ namespace Orleans.Consensus.Contract.Log
             }
 
             // If the entry is after all current entries, the log does not conflict.
-            if (this.LastLogIndex < entryId.Index || entryId.Index == 0)
+            if (this.LastLogEntryId.Index < entryId.Index || entryId.Index == 0)
             {
                 return false;
             }
@@ -75,13 +93,13 @@ namespace Orleans.Consensus.Contract.Log
 
         public Task AppendOrOverwrite(LogEntry<TOperation> logEntry)
         {
-            if (logEntry.Id.Index > this.LastLogIndex + 1)
+            if (logEntry.Id.Index > this.LastLogEntryId.Index + 1)
             {
                 throw new InvalidOperationException(
-                    $"Cannot append entry {logEntry.Id} because it is greater than the next index, {this.LastLogIndex + 1}.");
+                    $"Cannot append entry {logEntry.Id} because it is greater than the next index, {this.LastLogEntryId.Index + 1}.");
             }
 
-            if (logEntry.Id.Index == this.LastLogIndex + 1)
+            if (logEntry.Id.Index == this.LastLogEntryId.Index + 1)
             {
                 this.Entries.Add(logEntry);
             }

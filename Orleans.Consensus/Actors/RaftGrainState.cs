@@ -8,6 +8,7 @@ namespace Orleans.Consensus.Actors
 
     using Orleans;
     using Orleans.Consensus.Contract.Log;
+    using Orleans.Consensus.Log;
 
     [Serializable]
     public class RaftGrainState<TOperation> : GrainState

@@ -10,6 +10,7 @@ namespace Orleans.Consensus.Actors
     using Orleans.Consensus.Contract;
     using Orleans.Consensus.Contract.Log;
     using Orleans.Consensus.Contract.Messages;
+    using Orleans.Consensus.Log;
     using Orleans.Providers;
     using Orleans.Runtime;
 
@@ -34,36 +35,12 @@ namespace Orleans.Consensus.Actors
 
     public interface IHasLog<TOperation>
     {
-        InMemoryLog<TOperation> Log { get; }
+        IPersistentLog<TOperation> Log { get; }
     }
 
     public interface IRaftServerState<TOperation> : IRaftVolatileState, IRaftPersistentState, IHasLog<TOperation>
     {
         IStateMachine<TOperation> StateMachine { get; }
-    }
-
-
-    internal static class Settings
-    {
-        // TODO: Use less insanely high values.
-
-        public const int MinElectionTimeoutMilliseconds = 600;
-
-        public const int MaxElectionTimeoutMilliseconds = 2 * MinElectionTimeoutMilliseconds;
-
-        public const int HeartbeatTimeoutMilliseconds = MinElectionTimeoutMilliseconds / 3;
-
-        /// <summary>
-        /// The maximum number of log entries which will be included in an append request.
-        /// </summary>
-        public const int MaxLogEntriesPerAppendRequest = 10;
-
-        public static bool ApplyEntriesOnFollowers { get; }= false;
-    }
-
-    public interface IRandom
-    {
-        int Next(int minValue, int maxValue);
     }
 
     public class ConcurrentRandom : IRandom
@@ -195,7 +172,7 @@ namespace Orleans.Consensus.Actors
             if (this.StateMachine != null)
             {
                 foreach (var entry in
-                    this.Log.Entries.Skip((int)this.LastApplied).Take((int)(this.CommitIndex - this.LastApplied)))
+                    this.Log.GetCursor((int)this.LastApplied).Take((int)(this.CommitIndex - this.LastApplied)))
                 {
                     this.LogInfo($"Applying {entry}.");
                     await this.StateMachine.Apply(entry);
@@ -213,7 +190,7 @@ namespace Orleans.Consensus.Actors
         /// </summary>
         public ICollection<string> OtherServers { get; private set; }
 
-        public InMemoryLog<TOperation> Log => this.State.Log;
+        public IPersistentLog<TOperation> Log => this.State.Log;
 
         public int GetNextRandom(int minValue, int maxValue) => ConcurrentRandom.Instance.Next(minValue, maxValue);
 
@@ -223,8 +200,7 @@ namespace Orleans.Consensus.Actors
         public Task LogAndWriteState()
         {
             var s = this.State;
-            this.LogWarn(
-                $"Writing state: votedFor {s.VotedFor}, term: {s.CurrentTerm}, log: [{string.Join(", ", s.Log.Entries.Select(_ => _.Id))}]");
+            this.LogWarn($"Writing state: votedFor {s.VotedFor}, term: {s.CurrentTerm}, log: {s.Log.ProgressString()}");
             return this.WriteStateAsync();
         }
 
@@ -235,17 +211,17 @@ namespace Orleans.Consensus.Actors
             return this.LogAndWriteState();
         }
 
-        private void LogInfo(string message)
+        public void LogInfo(string message)
         {
             this.log.Info(this.GetLogMessage(message));
         }
 
-        private void LogWarn(string message)
+        public void LogWarn(string message)
         {
-            this.log.Warn(-1, this.GetLogMessage(message));
+            this.log.Warn(message.GetHashCode(), this.GetLogMessage(message));
         }
 
-        private void LogVerbose(string message)
+        public void LogVerbose(string message)
         {
             this.log.Verbose(this.GetLogMessage(message));
         }

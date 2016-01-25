@@ -10,8 +10,11 @@
     using Orleans.Consensus.Contract;
     using Orleans.Consensus.Contract.Log;
     using Orleans.Consensus.Contract.Messages;
+    using Orleans.Consensus.Log;
 
-    public abstract partial class RaftGrain<TOperation>
+    public interface IRaftGrain : ILogger {}
+
+    public abstract partial class RaftGrain<TOperation> : IRaftGrain
     {
         internal class LeaderRole : IRaftRole<TOperation>
         {
@@ -36,7 +39,7 @@
                 // Initialize volatile state on leader.
                 foreach (var server in this.self.OtherServers)
                 {
-                    this.servers[server] = new FollowerProgress { NextIndex = self.Log.LastLogIndex + 1, MatchIndex = 0 };
+                    this.servers[server] = new FollowerProgress { NextIndex = self.Log.LastLogEntryId.Index + 1, MatchIndex = 0 };
                 }
             }
 
@@ -132,11 +135,11 @@
                     {
                         await log.AppendOrOverwrite(
                             new LogEntry<TOperation>(
-                                new LogEntryId(this.self.State.CurrentTerm, log.LastLogIndex + 1),
+                                new LogEntryId(this.self.State.CurrentTerm, log.LastLogEntryId.Index + 1),
                                 entry));
                     }
 
-                    this.self.LogInfo($"Leader log is: [{string.Join(", ", this.self.Log.Entries.Select(_ => _.Id))}]");
+                    this.self.LogInfo($"Leader log is: {this.self.Log.ProgressString()}");
                 }
 
                 var tasks = new List<Task>(this.servers.Count);
@@ -173,14 +176,14 @@
                         LeaderCommitIndex = this.self.CommitIndex,
                         Term = this.self.State.CurrentTerm,
                         Entries =
-                            log.Entries.Skip((int)Math.Max(0, nextIndex - 1))
+                            log.GetCursor((int)Math.Max(0, nextIndex - 1))
                                 .Take(Settings.MaxLogEntriesPerAppendRequest)
                                 .ToList()
                     };
 
-                    if (nextIndex >= 2 && log.Entries.Count > nextIndex - 2)
+                    if (nextIndex >= 2 && log.LastLogEntryId.Index > nextIndex - 2)
                     {
-                        request.PreviousLogEntry = log.Entries[(int)nextIndex - 2].Id;
+                        request.PreviousLogEntry = log.Get((int)nextIndex - 1).Id;
                     }
 
                     this.lastMessageSentTime = DateTime.UtcNow;
@@ -251,7 +254,7 @@
 
             private Task UpdateCommittedIndex()
             {
-                foreach (var entry in this.self.Log.Reverse())
+                foreach (var entry in this.self.Log.GetReverseCursor())
                 {
                     if (entry.Id.Term != this.self.CurrentTerm)
                     {

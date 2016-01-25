@@ -54,9 +54,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ILogger.cs" />
     <Compile Include="IRaftGrain.cs" />
+    <Compile Include="IRandom.cs" />
     <Compile Include="ITestRaftGrain.cs" />
-    <Compile Include="Log\InMemoryLog.cs" />
+    <Compile Include="Log\IPersistentLog.cs" />
     <Compile Include="Log\LogEntry.cs" />
     <Compile Include="Log\LogEntryId.cs" />
     <Compile Include="Messages\AppendRequest.cs" />

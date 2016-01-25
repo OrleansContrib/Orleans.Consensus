@@ -96,7 +96,9 @@
   <ItemGroup>
     <Compile Include="Actors\RaftGrain.FollowerRole.cs" />
     <Compile Include="Actors\RaftGrain.LeaderRole.cs" />
+    <Compile Include="Actors\Settings.cs" />
     <Compile Include="CancellationTokenExtensions.cs" />
+    <Compile Include="Log\InMemoryLog.cs" />
     <Compile Include="IRaftRole.cs" />
     <Compile Include="IStateMachine.cs" />
     <Compile Include="Program.cs" />

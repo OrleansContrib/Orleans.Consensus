@@ -5,7 +5,9 @@
     using System.Linq;
     using System.Threading.Tasks;
 
+    using Orleans.Consensus.Contract.Log;
     using Orleans.Consensus.Contract.Messages;
+    using Orleans.Consensus.Log;
 
     public abstract partial class RaftGrain<TOperation>
     {
@@ -170,7 +172,7 @@
                     this.messagesSinceLastElectionExpiry++;
                     this.self.LogWarn(
                         $"Denying append {request}: Local log does not contain previous entry. "
-                        + $"Local: [{string.Join(", ", this.self.Log.Entries.Select(_ => _.Id))}]");
+                        + $"Local: {this.self.Log.ProgressString()}");
                     success = false;
                 }
                 // 3. If an existing entry conflicts with a new one (same index but different terms),
@@ -180,7 +182,7 @@
                     this.messagesSinceLastElectionExpiry++;
                     this.self.LogWarn(
                         $"Denying append {request}: Previous log entry {request.PreviousLogEntry} conflicts with "
-                        + $"local log: [{string.Join(", ", this.self.Log.Entries.Select(_ => _.Id))}]");
+                        + $"local log: {this.self.Log.ProgressString()}");
                     success = false;
                 }
                 else
@@ -203,13 +205,13 @@
                             await this.self.Log.AppendOrOverwrite(entry);
                         }
                         this.self.LogInfo(
-                            $"Accepted append. Log is now: [{string.Join(", ", this.self.Log.Entries.Select(_ => _.Id))}]");
+                            $"Accepted append. Log is now: {this.self.Log.ProgressString()}");
                     }
 
                     // 5. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry).
                     if (request.LeaderCommitIndex > this.self.CommitIndex)
                     {
-                        this.self.CommitIndex = Math.Min(request.LeaderCommitIndex, this.self.Log.LastLogIndex);
+                        this.self.CommitIndex = Math.Min(request.LeaderCommitIndex, this.self.Log.LastLogEntryId.Index);
                         
                         if (Settings.ApplyEntriesOnFollowers)
                         {
