@@ -5,7 +5,7 @@ namespace Orleans.Consensus.Contract.Log
     using Orleans.Concurrency;
 
     [Immutable]
-    public struct LogEntryId : IEquatable<LogEntryId>
+    public struct LogEntryId : IEquatable<LogEntryId>, IComparable<LogEntryId>
     {
         public LogEntryId(long term, long index)
         {
@@ -15,6 +15,41 @@ namespace Orleans.Consensus.Contract.Log
 
         public long Term { get; }
         public long Index { get; }
+
+        /// <summary>
+        /// Compares the current object with another object of the same type.
+        /// </summary>
+        /// <param name="other">An object to compare with this object.</param>
+        /// <returns>
+        /// A value that indicates the relative order of the objects being compared. The return value has the following
+        /// meanings: Value Meaning Less than zero This object is less than the <paramref name="other"/> parameter.
+        /// Zero This object is equal to <paramref name="other"/>. Greater than zero This object is greater than
+        /// <paramref name="other"/>. 
+        /// </returns>
+        public int CompareTo(LogEntryId other)
+        {
+            if (this.Term > other.Term)
+            {
+                return 1;
+            }
+
+            if (this.Term < other.Term)
+            {
+                return -1;
+            }
+
+            if (this.Index > other.Index)
+            {
+                return 1;
+            }
+
+            if (this.Index < other.Index)
+            {
+                return -1;
+            }
+
+            return 0;
+        }
 
         public override string ToString() => $"{this.Term}.{this.Index}";
 
