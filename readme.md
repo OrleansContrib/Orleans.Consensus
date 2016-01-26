@@ -11,8 +11,8 @@ Open project in VS, hit F5, watch the debug output.
 
 ## TODO
 
-* Extract interfaces for the concrete classes and clean them up.
-* Autofac for dependency injection to make the system more testable.
+* ~~Extract interfaces for the concrete classes and clean them up.~~
+* ~~Autofac for dependency injection to make the system more testable.~~
 * Extensive automated testing.
 * Use Orleans to provide cluster membership.
 * Implement Joint-Consensus for cluster membership change from the Raft paper.
