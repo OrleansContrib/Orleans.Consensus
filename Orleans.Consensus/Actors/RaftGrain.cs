@@ -2,87 +2,58 @@ namespace Orleans.Consensus.Actors
 {
     using System;
     using System.Collections.Generic;
-    using System.Linq;
-    using System.Security.Cryptography;
     using System.Threading.Tasks;
 
-    using Orleans;
+    using Autofac;
+
     using Orleans.Consensus.Contract;
     using Orleans.Consensus.Contract.Log;
     using Orleans.Consensus.Contract.Messages;
     using Orleans.Consensus.Log;
+    using Orleans.Consensus.Roles;
+    using Orleans.Consensus.Utilities;
     using Orleans.Providers;
     using Orleans.Runtime;
 
-    public interface IRaftVolatileState
-    {
-        long CommitIndex { get; set; }
-        long LastApplied { get; set; }
-        string LeaderId { get; set; }
+    public delegate IDisposable RegisterTimerDelegate(
+        Func<object, Task> callback,
+        object state,
+        TimeSpan dueTime,
+        TimeSpan period);
 
-        ICollection<string> OtherServers { get; }
-
-        int GetNextRandom(int minValue, int maxValue);
-    }
-
-    public interface IRaftPersistentState
-    {
-        string VotedFor { get; }
-        long CurrentTerm { get; }
-
-        Task UpdateTermAndVote(string votedFor, long currentTerm);
-    }
-
-    public interface IHasLog<TOperation>
-    {
-        IPersistentLog<TOperation> Log { get; }
-    }
-
-    public interface IRaftServerState<TOperation> : IRaftVolatileState, IRaftPersistentState, IHasLog<TOperation>
-    {
-        IStateMachine<TOperation> StateMachine { get; }
-    }
-
-    public class ConcurrentRandom : IRandom
-    {
-        private static readonly RNGCryptoServiceProvider GlobalRandom = new RNGCryptoServiceProvider();
-
-        [ThreadStatic]
-        private static Random local;
-
-        public static ConcurrentRandom Instance { get; } = new ConcurrentRandom();
-
-        public int Next(int minValue, int maxValue)
-        {
-            var inst = local;
-            if (inst == null)
-            {
-                var buffer = new byte[4];
-                GlobalRandom.GetBytes(buffer);
-                local = inst = new Random(BitConverter.ToInt32(buffer, 0));
-            }
-
-            return inst.Next(minValue, maxValue);
-        }
-    }
-    
     [StorageProvider]
-    public abstract partial class RaftGrain<TOperation> : Grain<RaftGrainState<TOperation>>,
-                                                          IRaftGrain<TOperation>,
-                                                          IRaftServerState<TOperation>
+    public abstract class RaftGrain<TOperation> : Grain<RaftGrainState<TOperation>>,
+                                                  IRaftGrain<TOperation>
     {
-        private IRaftRole<TOperation> role;
+        private ILifetimeScope container;
 
-        // TODO provide a state machine.
-        public IStateMachine<TOperation> StateMachine { get; protected set; }
+        private IRoleCoordinator<TOperation> coordinator;
+
+        private IPersistentLog<TOperation> journal;
 
         private Logger log;
 
-        protected string Id => this.GetPrimaryKeyString();
+        private ILogger logger;
+
+        private IRaftPersistentState persistentState;
+
+        public Task<RequestVoteResponse> RequestVote(RequestVoteRequest request)
+            => this.coordinator.Role.RequestVote(request);
+
+        public Task<AppendResponse> Append(AppendRequest<TOperation> request) => this.coordinator.Role.Append(request);
+        
+        // TODO provide a state machine.
+        protected abstract IStateMachine<TOperation> GetStateMachine(IComponentContext context);
 
         protected Task AppendEntry(TOperation entry)
         {
-            return this.role.ReplicateAndApplyEntries(new List<TOperation> { entry });
+            return this.coordinator.Role.ReplicateAndApplyEntries(new List<TOperation> { entry });
+        }
+
+        private string GetLogMessage(string message)
+        {
+            return
+                $"[{this.coordinator.Role.State} in term {this.persistentState.CurrentTerm}, LastLog: ({this.journal.LastLogEntryId})] {message}";
         }
 
         /// <summary>
@@ -96,140 +67,101 @@ namespace Orleans.Consensus.Actors
             this.log.Info("Activating");
 
             // TODO: Get servers from Orleans' memberhsip provider.
-            var allServers = new HashSet<string> { "one", "two", "three" };
-            this.OtherServers = new HashSet<string>(allServers);
+            var allServers = new[] { "one", "two", "three" };
 
-            this.State.Log.WriteCallback = this.LogAndWriteState;
+            var applicationContainerBuilder = new ContainerBuilder();
+            /* in a common location, build the application services */
+            var applicationContainer = applicationContainerBuilder.Build();
 
-            if (this.State.CurrentTerm == 0 && this.Id == allServers.Min())
-            {
-                // As an attempted optimization, immediately become a candidate for the first term if this server has
-                // just been initialized.
-                // The candidacy will fail quickly if this server is being added to an existing cluster and the server
-                // will revert to follower in the updated term.
-                await this.BecomeCandidate();
-            }
-            else
-            {
-                // When servers start up, they begin as followers. (§5.2)
-                await this.BecomeFollowerForTerm(this.State.CurrentTerm);
-            }
+            // Build the container for this grain's scope.
+            this.container = applicationContainer.BeginLifetimeScope(
+                builder =>
+                {
+                    builder.RegisterInstance(this.GrainFactory).SingleInstance().PreserveExistingDefaults();
+                    builder.Register<IServerIdentity>(_ => new ServerIdentity { Id = this.GetPrimaryKeyString() })
+                        .SingleInstance()
+                        .PreserveExistingDefaults();
 
-            this.OtherServers.Remove(this.GetPrimaryKeyString());
+                    builder.RegisterType<StaticMembershipProvider>()
+                        .OnActivated(_ => _.Instance.SetServers(allServers))
+                        .SingleInstance()
+                        .AsImplementedInterfaces()
+                        .PreserveExistingDefaults();
+                    builder.RegisterType<VolatileState>()
+                        .SingleInstance()
+                        .AsImplementedInterfaces()
+                        .PreserveExistingDefaults();
+
+                    builder.Register(_ => new OrleansLogger(this.log) { FormatMessage = this.GetLogMessage })
+                        .SingleInstance()
+                        .AsImplementedInterfaces()
+                        .PreserveExistingDefaults();
+                    builder.RegisterType<RoleCoordinator<TOperation>>()
+                        .SingleInstance()
+                        .AsImplementedInterfaces()
+                        .PreserveExistingDefaults();
+                    builder.RegisterInstance<RegisterTimerDelegate>(this.RegisterTimer).SingleInstance().PreserveExistingDefaults();
+                    builder.Register<IRandom>(_ => ConcurrentRandom.Instance)
+                        .SingleInstance()
+                        .PreserveExistingDefaults();
+
+                    // By default, all persistent state is stored using the configured grain state storage provider.
+                    builder.Register<IRaftPersistentState>(
+                        _ => new OrleansStorageRaftPersistentState<TOperation>(this.State, this.LogAndWriteState))
+                        .SingleInstance()
+                        .PreserveExistingDefaults();
+                    builder.Register(_ => this.State.Log)
+                        .OnActivated(_ => _.Instance.WriteCallback = this.LogAndWriteJournal)
+                        .SingleInstance()
+                        .As<IPersistentLog<TOperation>>()
+                        .PreserveExistingDefaults();
+
+                    // Register roles.
+                    builder.RegisterType<FollowerRole<TOperation>>().PreserveExistingDefaults();
+                    builder.RegisterType<CandidateRole<TOperation>>().PreserveExistingDefaults();
+                    builder.RegisterType<LeaderRole<TOperation>>().PreserveExistingDefaults();
+
+                    // The consumer typically provides their own state machine, so register the method used to retrieve
+                    // it.
+                    builder.Register(this.GetStateMachine);
+                });
+
+            // Resolve services.
+            this.persistentState = this.container.Resolve<IRaftPersistentState>();
+            this.coordinator = this.container.Resolve<IRoleCoordinator<TOperation>>();
+            this.journal = this.container.Resolve<IPersistentLog<TOperation>>();
+            this.logger = this.container.Resolve<ILogger>();
+
+            await this.coordinator.Initialize();
+
             await base.OnActivateAsync();
         }
 
-        private async Task<bool> StepDownIfGreaterTerm<TMessage>(TMessage message) where TMessage : IMessage
+        /// <summary>
+        /// This method is called at the begining of the process of deactivating a grain.
+        /// </summary>
+        public override async Task OnDeactivateAsync()
         {
-            // If RPC request or response contains term T > currentTerm: set currentTerm = T, convert
-            // to follower (§5.1)
-            if (message.Term > this.State.CurrentTerm)
+            if (this.coordinator != null)
             {
-                this.log.Info(
-                    $"Stepping down for term {message.Term}, which is greater than current term, {this.State.CurrentTerm}.");
-                await this.BecomeFollowerForTerm(message.Term);
-                return true;
+                await this.coordinator.Shutdown();
             }
 
-            return false;
+            this.container.Dispose();
+            await base.OnDeactivateAsync();
         }
 
-        private async Task BecomeFollowerForTerm(long term)
+        private Task LogAndWriteState()
         {
-            await this.TransitionRole(new FollowerRole(this, term));
-        }
-
-        private async Task TransitionRole(IRaftRole<TOperation> handler)
-        {
-            if (this.role != null)
-            {
-                await this.role.Exit();
-            }
-
-            this.role = handler;
-            await this.role.Enter();
-        }
-
-        /// <summary>
-        /// Transitions into the candidate state.
-        /// </summary>
-        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
-        private Task BecomeCandidate() => this.TransitionRole(new CandidateRole(this));
-
-        /// <summary>
-        /// Transitions into the leader state.
-        /// </summary>
-        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
-        private Task BecomeLeader() => this.TransitionRole(new LeaderRole(this));
-
-        public Task<RequestVoteResponse> RequestVote(RequestVoteRequest request)
-            => this.role.RequestVote(request);
-
-        public Task<AppendResponse> Append(AppendRequest<TOperation> request) => this.role.Append(request);
-
-        private async Task ApplyRemainingCommittedEntries()
-        {
-            if (this.StateMachine != null)
-            {
-                foreach (var entry in
-                    this.Log.GetCursor((int)this.LastApplied).Take((int)(this.CommitIndex - this.LastApplied)))
-                {
-                    this.LogInfo($"Applying {entry}.");
-                    await this.StateMachine.Apply(entry);
-                    this.LastApplied = entry.Id.Index;
-                }
-            }
-        }
-
-        public long CommitIndex { get; set; }
-        public long LastApplied { get; set; }
-        public string LeaderId { get; set; }
-
-        /// <summary>
-        /// The collection of servers other than the current server.
-        /// </summary>
-        public ICollection<string> OtherServers { get; private set; }
-
-        public IPersistentLog<TOperation> Log => this.State.Log;
-
-        public int GetNextRandom(int minValue, int maxValue) => ConcurrentRandom.Instance.Next(minValue, maxValue);
-
-        public string VotedFor => this.State.VotedFor;
-        public long CurrentTerm => this.State.CurrentTerm;
-
-        public Task LogAndWriteState()
-        {
-            var s = this.State;
-            this.LogWarn($"Writing state: votedFor {s.VotedFor}, term: {s.CurrentTerm}, log: {s.Log.ProgressString()}");
+            this.logger.LogInfo(
+                $"Writing state: votedFor {this.persistentState.VotedFor}, term: {this.persistentState.CurrentTerm}");
             return this.WriteStateAsync();
         }
 
-        public Task UpdateTermAndVote(string votedFor, long currentTerm)
+        private Task LogAndWriteJournal()
         {
-            this.State.VotedFor = votedFor;
-            this.State.CurrentTerm = currentTerm;
-            return this.LogAndWriteState();
-        }
-
-        public void LogInfo(string message)
-        {
-            this.log.Info(this.GetLogMessage(message));
-        }
-
-        public void LogWarn(string message)
-        {
-            this.log.Warn(message.GetHashCode(), this.GetLogMessage(message));
-        }
-
-        public void LogVerbose(string message)
-        {
-            this.log.Verbose(this.GetLogMessage(message));
-        }
-
-        private string GetLogMessage(string message)
-        {
-            return
-                $"[{this.role.State} in term {this.State.CurrentTerm}, LastLog: ({this.Log.LastLogEntryId})] {message}";
+            this.logger.LogInfo($"Writing log: {this.journal.ProgressString()}");
+            return this.WriteStateAsync();
         }
     }
 }

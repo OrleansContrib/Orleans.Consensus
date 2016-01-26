@@ -36,12 +36,28 @@
     <StartupObject>Orleans.Consensus.Program</StartupObject>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Autofac, Version=4.0.0.0, Culture=neutral, PublicKeyToken=17863af14b0044da, processorArchitecture=MSIL">
+      <HintPath>..\packages\Autofac.4.0.0-rc1-177\lib\net45\Autofac.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Autofac.Extensions.DependencyInjection, Version=4.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Autofac.Extensions.DependencyInjection.4.0.0-rc1-177\lib\net451\Autofac.Extensions.DependencyInjection.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="Microsoft.CodeAnalysis, Version=1.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.CodeAnalysis.Common.1.0.0\lib\net45\Microsoft.CodeAnalysis.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Microsoft.CodeAnalysis.CSharp, Version=1.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.CodeAnalysis.CSharp.1.0.0\lib\net45\Microsoft.CodeAnalysis.CSharp.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.Extensions.DependencyInjection, Version=1.0.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Extensions.DependencyInjection.1.0.0-rc1-final\lib\net451\Microsoft.Extensions.DependencyInjection.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.Extensions.DependencyInjection.Abstractions, Version=1.0.0.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Extensions.DependencyInjection.Abstractions.1.0.0-rc1-final\lib\net451\Microsoft.Extensions.DependencyInjection.Abstractions.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Newtonsoft.Json, Version=6.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
@@ -94,8 +110,20 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Actors\RaftGrain.FollowerRole.cs" />
-    <Compile Include="Actors\RaftGrain.LeaderRole.cs" />
+    <Compile Include="Actors\IMembershipProvider.cs" />
+    <Compile Include="Actors\IRaftPersistentState.cs" />
+    <Compile Include="Actors\IRaftVolatileState.cs" />
+    <Compile Include="Actors\IRoleCoordinator.cs" />
+    <Compile Include="Actors\IServerIdentity.cs" />
+    <Compile Include="Actors\OrleansStorageRaftPersistentState.cs" />
+    <Compile Include="Actors\RoleCoordinator.cs" />
+    <Compile Include="Actors\ServerIdentity.cs" />
+    <Compile Include="Actors\StaticMembershipProvider.cs" />
+    <Compile Include="Actors\VolatileState.cs" />
+    <Compile Include="Utilities\ConcurrentRandom.cs" />
+    <Compile Include="OrleansLogger.cs" />
+    <Compile Include="Roles\FollowerRole.cs" />
+    <Compile Include="Roles\LeaderRole.cs" />
     <Compile Include="Actors\Settings.cs" />
     <Compile Include="CancellationTokenExtensions.cs" />
     <Compile Include="Log\InMemoryLog.cs" />
@@ -109,7 +137,7 @@
     <Compile Include="Actors\TestRaftGrain.cs" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Actors\RaftGrain.CandidateRole.cs" />
+    <Compile Include="Roles\CandidateRole.cs" />
     <None Include="app.config" />
     <None Include="packages.config" />
   </ItemGroup>

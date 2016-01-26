@@ -1,8 +1,7 @@
-﻿using System.Threading.Tasks;
-
-namespace Orleans.Consensus
+﻿namespace Orleans.Consensus
 {
     using System.Threading;
+    using System.Threading.Tasks;
 
     internal static class CancellationTokenExtensions
     {

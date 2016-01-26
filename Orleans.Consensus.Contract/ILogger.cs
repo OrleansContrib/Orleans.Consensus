@@ -1,6 +1,7 @@
 namespace Orleans.Consensus.Actors
 {
-    public interface ILogger {
+    public interface ILogger
+    {
         void LogInfo(string message);
 
         void LogWarn(string message);

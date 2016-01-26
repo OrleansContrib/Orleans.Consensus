@@ -4,33 +4,30 @@ namespace Orleans.Consensus.Actors
     using System.Text;
     using System.Threading.Tasks;
 
+    using Autofac;
+
     using Orleans.Consensus.Contract;
     using Orleans.Consensus.Contract.Log;
     using Orleans.Runtime;
 
     public class TestRaftGrain : RaftGrain<string>, ITestRaftGrain
     {
+        private readonly BigString stateMachine;
+
         private Logger log;
+
         public TestRaftGrain()
         {
-            this.StateMachine = new BigString();
-        }
-
-        /// <summary>
-        /// This method is called at the end of the process of activating a grain.
-        ///             It is called before any messages have been dispatched to the grain.
-        ///             For grains with declared persistent state, this method is called after the State property has been populated.
-        /// </summary>
-        public override async Task OnActivateAsync()
-        {
-            this.log = this.GetLogger($"TEST {this.GetPrimaryKeyString()}");
-            await base.OnActivateAsync();
+            this.stateMachine = new BigString();
         }
 
         public Task AddValue(string value)
         {
             this.log.Error(0, $"TEST: AddValue({value})");
-            if (string.IsNullOrEmpty(value)) return Task.FromResult(0);
+            if (string.IsNullOrEmpty(value))
+            {
+                return Task.FromResult(0);
+            }
             return this.AppendEntry(value);
         }
 
@@ -50,7 +47,20 @@ namespace Orleans.Consensus.Actors
 
         public Task<string> GetState()
         {
-            return Task.FromResult(((BigString)this.StateMachine).GetValue());
+            return Task.FromResult(this.stateMachine.GetValue());
+        }
+
+        protected override IStateMachine<string> GetStateMachine(IComponentContext context) => this.stateMachine;
+
+        /// <summary>
+        /// This method is called at the end of the process of activating a grain.
+        ///             It is called before any messages have been dispatched to the grain.
+        ///             For grains with declared persistent state, this method is called after the State property has been populated.
+        /// </summary>
+        public override async Task OnActivateAsync()
+        {
+            this.log = this.GetLogger($"TEST {this.GetPrimaryKeyString()}");
+            await base.OnActivateAsync();
         }
     }
 

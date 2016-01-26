@@ -33,6 +33,7 @@
                 }
             }
         }
+
         private static void Run()
         {
             var config = GetClusterConfiguration();
@@ -52,10 +53,7 @@
             Trace.TraceInformation("Silo configuration: \n" + silo.Config.ToString(name));
 
             silo.InitializeOrleansSilo();
-            Trace.TraceInformation(
-                "Successfully initialized Orleans silo '{0}' as a {1} node.",
-                silo.Name,
-                silo.Type);
+            Trace.TraceInformation("Successfully initialized Orleans silo '{0}' as a {1} node.", silo.Name, silo.Type);
             Trace.TraceInformation("Starting Orleans silo '{0}' as a {1} node.", silo.Name, silo.Type);
 
             if (silo.StartOrleansSilo())

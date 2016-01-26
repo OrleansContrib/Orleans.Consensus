@@ -59,7 +59,7 @@
                     <RowDefinition />
                 </Grid.RowDefinitions>
                 <TextBlock >Current Leader:</TextBlock>
-                <TextBox Grid.Row="1" x:Name="Leader"></TextBox>
+                <TextBox Grid.Row="1" x:Name="Leader" />
             </Grid>
             <Grid Grid.Column="1">
                 <Grid.RowDefinitions>
@@ -68,7 +68,7 @@
                     <RowDefinition />
                 </Grid.RowDefinitions>
                 <TextBlock>Text:</TextBlock>
-                <TextBox Grid.Row="1" x:Name="AppendText"></TextBox>
+                <TextBox Grid.Row="1" x:Name="AppendText" />
                 <Button Grid.Row="2" Click="Client_AppendText">Append</Button>
             </Grid>
         </Grid>

@@ -5,9 +5,9 @@ namespace Orleans.Consensus.Contract.Log
 
     public interface IPersistentLog<TOperation>
     {
-        IEnumerable<LogEntry<TOperation>> GetReverseCursor();
-
         LogEntryId LastLogEntryId { get; }
+
+        IEnumerable<LogEntry<TOperation>> GetReverseCursor();
 
         LogEntry<TOperation> Get(long index);
 

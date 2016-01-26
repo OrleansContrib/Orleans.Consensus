@@ -9,9 +9,9 @@ namespace Orleans.Consensus.Contract.Messages
     [Serializable]
     public class AppendResponse : IMessage
     {
-        public long Term { get; set; }
         public bool Success { get; set; }
 
         public LogEntryId LastLogEntryId { get; set; }
+        public long Term { get; set; }
     }
 }

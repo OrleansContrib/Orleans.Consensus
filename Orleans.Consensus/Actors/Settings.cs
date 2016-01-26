@@ -15,6 +15,6 @@ namespace Orleans.Consensus.Actors
         /// </summary>
         public const int MaxLogEntriesPerAppendRequest = 10;
 
-        public static bool ApplyEntriesOnFollowers { get; }= false;
+        public static bool ApplyEntriesOnFollowers { get; } = false;
     }
 }

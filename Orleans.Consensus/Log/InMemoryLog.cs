@@ -23,6 +23,18 @@ namespace Orleans.Consensus.Log
 
         internal List<LogEntry<TOperation>> Entries { get; } = new List<LogEntry<TOperation>>();
 
+        public Func<Task> WriteCallback
+        {
+            get
+            {
+                return this.writeCallback;
+            }
+            set
+            {
+                this.writeCallback = value;
+            }
+        }
+
         public IEnumerable<LogEntry<TOperation>> GetReverseCursor() => Enumerable.Reverse(this.Entries);
 
         public LogEntryId LastLogEntryId
@@ -109,18 +121,6 @@ namespace Orleans.Consensus.Log
             }
 
             return this.WriteCallback?.Invoke() ?? Task.FromResult(0);
-        }
-
-        public Func<Task> WriteCallback
-        {
-            get
-            {
-                return this.writeCallback;
-            }
-            set
-            {
-                this.writeCallback = value;
-            }
         }
     }
 }

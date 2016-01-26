@@ -1,13 +1,7 @@
-﻿using Orleans.CodeGeneration;
-using Orleans.Consensus.Contract.Messages;
-
-[assembly: KnownType(typeof(NotLeaderException))]
-namespace Orleans.Consensus.Actors
+﻿namespace Orleans.Consensus.Actors
 {
     using System;
 
-    using Orleans;
-    using Orleans.Consensus.Contract.Log;
     using Orleans.Consensus.Log;
 
     [Serializable]
@@ -18,4 +12,3 @@ namespace Orleans.Consensus.Actors
         public InMemoryLog<TOperation> Log { get; set; } = new InMemoryLog<TOperation>();
     }
 }
- 

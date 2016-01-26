@@ -2,7 +2,6 @@
 {
     using System.Threading.Tasks;
 
-    using Orleans;
     using Orleans.Consensus.Contract;
     using Orleans.Providers;
 

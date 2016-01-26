@@ -1,28 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
-
-namespace TestConsole
+﻿namespace TestConsole
 {
+    using System;
     using System.Net;
+    using System.Windows;
 
     using Orleans;
     using Orleans.Consensus.Contract;
     using Orleans.Consensus.Contract.Messages;
-    using Orleans.Runtime;
     using Orleans.Runtime.Configuration;
-    using Orleans.Storage;
 
     /// <summary>
     /// Interaction logic for MainWindow.xaml
@@ -31,7 +16,7 @@ namespace TestConsole
     {
         public MainWindow()
         {
-            InitializeComponent();
+            this.InitializeComponent();
             var config = GetClusterConfiguration();
 
             this.Leader.Text = "one";
@@ -51,26 +36,31 @@ namespace TestConsole
             var grain = GrainClient.GrainFactory.GetGrain<ITestRaftGrain>("one");
             await grain.Delay(TimeSpan.FromSeconds(15));
         }
+
         private async void One_Crash(object sender, RoutedEventArgs e)
         {
             var grain = GrainClient.GrainFactory.GetGrain<ITestRaftGrain>("one");
             await grain.Crash();
         }
+
         private async void Two_Stall(object sender, RoutedEventArgs e)
         {
             var grain = GrainClient.GrainFactory.GetGrain<ITestRaftGrain>("two");
             await grain.Delay(TimeSpan.FromSeconds(15));
         }
+
         private async void Two_Crash(object sender, RoutedEventArgs e)
         {
             var grain = GrainClient.GrainFactory.GetGrain<ITestRaftGrain>("two");
             await grain.Crash();
         }
+
         private async void Three_Stall(object sender, RoutedEventArgs e)
         {
             var grain = GrainClient.GrainFactory.GetGrain<ITestRaftGrain>("three");
             await grain.Delay(TimeSpan.FromSeconds(15));
         }
+
         private async void Three_Crash(object sender, RoutedEventArgs e)
         {
             var grain = GrainClient.GrainFactory.GetGrain<ITestRaftGrain>("three");
@@ -91,7 +81,7 @@ namespace TestConsole
 
             return config;
         }
-        
+
         private async void Client_AppendText(object sender, RoutedEventArgs e)
         {
             NotLeaderException notLeaderException = null;
@@ -111,7 +101,6 @@ namespace TestConsole
             }
             catch {}
 
-
             if (notLeaderException != null)
             {
                 if (!string.IsNullOrWhiteSpace(notLeaderException.Leader))
@@ -119,7 +108,6 @@ namespace TestConsole
                     this.Leader.Text = notLeaderException.Leader;
                 }
             }
-
         }
     }
 }

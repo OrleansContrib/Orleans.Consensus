@@ -28,7 +28,8 @@ namespace Orleans.Consensus.Contract.Messages
         /// </returns>
         public override string ToString()
         {
-            return $"{nameof(RequestVoteRequest)}(Candidate: {this.Candidate}, LastLogEntryId: {this.LastLogEntryId}, Term: {this.Term})";
+            return
+                $"{nameof(RequestVoteRequest)}(Candidate: {this.Candidate}, LastLogEntryId: {this.LastLogEntryId}, Term: {this.Term})";
         }
     }
 }

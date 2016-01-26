@@ -8,7 +8,7 @@ namespace Orleans.Consensus.Contract.Messages
     [Serializable]
     public class RequestVoteResponse : IMessage
     {
-        public long Term { get; set; }
         public bool VoteGranted { get; set; }
+        public long Term { get; set; }
     }
 }

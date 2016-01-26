@@ -11,7 +11,6 @@
     [Serializable]
     public class AppendRequest<TOperation> : IMessage
     {
-        public long Term { get; set; }
         public string Leader { get; set; }
         public LogEntryId PreviousLogEntry { get; set; }
 
@@ -19,7 +18,9 @@
         /// Empty for heartbeat
         /// </summary>
         public List<LogEntry<TOperation>> Entries { get; set; }
+
         public long LeaderCommitIndex { get; set; }
+        public long Term { get; set; }
 
         /// <summary>
         /// Returns a string that represents the current object.

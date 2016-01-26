@@ -9,23 +9,11 @@ namespace Orleans.Consensus.Contract.Messages
     [Serializable]
     public class NotLeaderException : Exception
     {
-        /// <summary>
-        /// When overridden in a derived class, sets the <see cref="T:System.Runtime.Serialization.SerializationInfo"/> with information about the exception.
-        /// </summary>
-        /// <param name="info">The <see cref="T:System.Runtime.Serialization.SerializationInfo"/> that holds the serialized object data about the exception being thrown. </param><param name="context">The <see cref="T:System.Runtime.Serialization.StreamingContext"/> that contains contextual information about the source or destination. </param><exception cref="T:System.ArgumentNullException">The <paramref name="info"/> parameter is a null reference (Nothing in Visual Basic). </exception><PermissionSet><IPermission class="System.Security.Permissions.FileIOPermission, mscorlib, Version=2.0.3600.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" version="1" Read="*AllFiles*" PathDiscovery="*AllFiles*"/><IPermission class="System.Security.Permissions.SecurityPermission, mscorlib, Version=2.0.3600.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" version="1" Flags="SerializationFormatter"/></PermissionSet>
-        public override void GetObjectData(SerializationInfo info, StreamingContext context)
-        {
-            info.AddValue(nameof(this.Leader), this.Leader);
-            base.GetObjectData(info, context);
-        }
-
         public NotLeaderException(string leader)
             : base($"This instance is not the leader, '{leader ?? "no instance"}' is.")
         {
             this.Leader = leader;
         }
-
-        public string Leader { get; set; }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="T:System.Exception"/> class.
@@ -47,6 +35,18 @@ namespace Orleans.Consensus.Contract.Messages
             : base(info, context)
         {
             this.Leader = info.GetString(nameof(this.Leader));
+        }
+
+        public string Leader { get; set; }
+
+        /// <summary>
+        /// When overridden in a derived class, sets the <see cref="T:System.Runtime.Serialization.SerializationInfo"/> with information about the exception.
+        /// </summary>
+        /// <param name="info">The <see cref="T:System.Runtime.Serialization.SerializationInfo"/> that holds the serialized object data about the exception being thrown. </param><param name="context">The <see cref="T:System.Runtime.Serialization.StreamingContext"/> that contains contextual information about the source or destination. </param><exception cref="T:System.ArgumentNullException">The <paramref name="info"/> parameter is a null reference (Nothing in Visual Basic). </exception><PermissionSet><IPermission class="System.Security.Permissions.FileIOPermission, mscorlib, Version=2.0.3600.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" version="1" Read="*AllFiles*" PathDiscovery="*AllFiles*"/><IPermission class="System.Security.Permissions.SecurityPermission, mscorlib, Version=2.0.3600.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" version="1" Flags="SerializationFormatter"/></PermissionSet>
+        public override void GetObjectData(SerializationInfo info, StreamingContext context)
+        {
+            info.AddValue(nameof(this.Leader), this.Leader);
+            base.GetObjectData(info, context);
         }
     }
 }
