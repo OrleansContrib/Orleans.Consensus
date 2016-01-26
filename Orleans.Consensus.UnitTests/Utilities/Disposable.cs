@@ -1,4 +1,4 @@
-namespace Orleans.Consensus.UnitTests
+namespace Orleans.Consensus.UnitTests.Utilities
 {
     using System;
 

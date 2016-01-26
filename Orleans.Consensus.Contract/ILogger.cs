@@ -1,4 +1,4 @@
-namespace Orleans.Consensus.Actors
+namespace Orleans.Consensus.Contract
 {
     public interface ILogger
     {

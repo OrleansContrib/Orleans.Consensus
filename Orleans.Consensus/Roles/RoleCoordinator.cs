@@ -7,6 +7,7 @@ namespace Orleans.Consensus.Roles
     using Autofac;
 
     using Orleans.Consensus.Actors;
+    using Orleans.Consensus.Contract;
     using Orleans.Consensus.Contract.Messages;
     using Orleans.Consensus.State;
 

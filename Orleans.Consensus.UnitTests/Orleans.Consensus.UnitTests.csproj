@@ -79,11 +79,12 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Disposable.cs" />
+    <Compile Include="Utilities\Disposable.cs" />
     <Compile Include="FollowerRoleTests.cs" />
     <Compile Include="LogEntryIdTests.cs" />
-    <Compile Include="MockTimers.cs" />
+    <Compile Include="Utilities\MockTimers.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Utilities\TestLogger.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
@@ -99,9 +100,7 @@
       <Name>Orleans.Consensus</Name>
     </ProjectReference>
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Utilities\" />
-  </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
