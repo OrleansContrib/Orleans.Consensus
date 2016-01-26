@@ -56,10 +56,10 @@ namespace Orleans.Consensus.Contract.Log
         /// <summary>
         /// Indicates whether the current object is equal to another object of the same type.
         /// </summary>
+        /// <param name="other">An object to compare with this object.</param>
         /// <returns>
         /// true if the current object is equal to the <paramref name="other"/> parameter; otherwise, false.
         /// </returns>
-        /// <param name="other">An object to compare with this object.</param>
         public bool Equals(LogEntryId other)
         {
             return this.Term == other.Term && this.Index == other.Index;
@@ -68,10 +68,10 @@ namespace Orleans.Consensus.Contract.Log
         /// <summary>
         /// Indicates whether this instance and a specified object are equal.
         /// </summary>
+        /// <param name="obj">The object to compare with the current instance. </param>
         /// <returns>
         /// true if <paramref name="obj"/> and this instance are the same type and represent the same value; otherwise, false. 
         /// </returns>
-        /// <param name="obj">The object to compare with the current instance. </param>
         public override bool Equals(object obj)
         {
             if (ReferenceEquals(null, obj))
