@@ -29,7 +29,7 @@ namespace Orleans.Consensus.Roles
 
         private readonly IGrainFactory grainFactory;
 
-        private readonly TimeSpan heartbeatTimeout = TimeSpan.FromMilliseconds(Settings.HeartbeatTimeoutMilliseconds);
+        private readonly TimeSpan heartbeatTimeout;
 
         private readonly IServerIdentity identity;
 
@@ -39,12 +39,14 @@ namespace Orleans.Consensus.Roles
 
         private readonly IMembershipProvider membershipProvider;
 
+        private readonly ISettings settings;
+
         private readonly IRaftPersistentState persistentState;
 
         private readonly Dictionary<string, FollowerProgress> servers = new Dictionary<string, FollowerProgress>();
 
         private readonly IStateMachine<TOperation> stateMachine;
-        
+
         private readonly IRaftVolatileState volatileState;
 
         private IDisposable heartbeatTimer;
@@ -65,7 +67,8 @@ namespace Orleans.Consensus.Roles
             IGrainFactory grainFactory,
             RegisterTimerDelegate registerTimer,
             IServerIdentity identity,
-            IMembershipProvider membershipProvider)
+            IMembershipProvider membershipProvider,
+            ISettings settings)
         {
             this.coordinator = coordinator;
             this.logger = logger;
@@ -77,6 +80,8 @@ namespace Orleans.Consensus.Roles
             this.registerTimer = registerTimer;
             this.identity = identity;
             this.membershipProvider = membershipProvider;
+            this.settings = settings;
+            this.heartbeatTimeout = TimeSpan.FromMilliseconds(this.settings.HeartbeatTimeoutMilliseconds);
         }
 
         private int QuorumSize => (this.servers.Count + 1) / 2;
@@ -182,7 +187,7 @@ namespace Orleans.Consensus.Roles
 
                 tasks.Add(this.AppendEntriesOnServer(server.Key, server.Value));
             }
-            
+
             await Task.WhenAll(tasks);
             if (this.madeProgress)
             {
@@ -230,7 +235,7 @@ namespace Orleans.Consensus.Roles
                     Term = this.persistentState.CurrentTerm,
                     Entries =
                         this.journal.GetCursor((int)Math.Max(0, nextIndex - 1))
-                            .Take(Settings.MaxLogEntriesPerAppendRequest)
+                            .Take(this.settings.MaxLogEntriesPerAppendRequest)
                             .ToList()
                 };
 
@@ -297,7 +302,7 @@ namespace Orleans.Consensus.Roles
                 // In an attempt to maintain fairness and retain leader status, bail out of catchup if the call has taken
                 // more than the allotted time.
                 if (this.callTimer.ElapsedMilliseconds
-                    >= Settings.HeartbeatTimeoutMilliseconds / (this.membershipProvider.AllServers.Count - 1))
+                    >= this.settings.HeartbeatTimeoutMilliseconds / (this.membershipProvider.AllServers.Count - 1))
                 {
                     this.logger.LogInfo(
                         $"Bailing on '{serverId}' catch-up due to fairness. Elapsed: {this.callTimer.ElapsedMilliseconds}.");

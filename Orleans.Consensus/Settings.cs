@@ -1,24 +1,24 @@
-namespace Orleans.Consensus.Actors
+namespace Orleans.Consensus
 {
-    internal static class Settings
+    internal class Settings : ISettings
     {
         // TODO: Use less insanely high values.
 
-        public const int MinElectionTimeoutMilliseconds = 600;
+        public int MinElectionTimeoutMilliseconds { get; } = 600;
 
-        public const int MaxElectionTimeoutMilliseconds = 2 * MinElectionTimeoutMilliseconds;
+        public int MaxElectionTimeoutMilliseconds => 2 * this.MinElectionTimeoutMilliseconds;
 
-        public const int HeartbeatTimeoutMilliseconds = MinElectionTimeoutMilliseconds / 3;
+        public int HeartbeatTimeoutMilliseconds => this.MinElectionTimeoutMilliseconds / 3;
 
         /// <summary>
         /// The maximum number of log entries which will be included in an append request.
         /// </summary>
-        public const int MaxLogEntriesPerAppendRequest = 10;
+        public int MaxLogEntriesPerAppendRequest { get; } = 10;
 
         /// <summary>
         /// Gets a value indicating whether or not committed operations should be applied to the state machine on a
         /// server which is currently a follower.
         /// </summary>
-        public static bool ApplyEntriesOnFollowers { get; } = false;
+        public bool ApplyEntriesOnFollowers { get; } = false;
     }
 }

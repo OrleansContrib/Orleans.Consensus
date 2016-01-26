@@ -27,6 +27,8 @@
 
         private readonly IMembershipProvider membershipProvider;
 
+        private readonly ISettings settings;
+
         private readonly IRaftPersistentState persistentState;
 
         private readonly IRandom random;
@@ -49,7 +51,8 @@
             IGrainFactory grainFactory,
             RegisterTimerDelegate registerTimer,
             IServerIdentity identity,
-            IMembershipProvider membershipProvider)
+            IMembershipProvider membershipProvider,
+            ISettings settings)
         {
             this.local = local;
             this.logger = logger;
@@ -61,6 +64,7 @@
             this.registerTimer = registerTimer;
             this.identity = identity;
             this.membershipProvider = membershipProvider;
+            this.settings = settings;
         }
 
         public string RoleName => "Candidate";
@@ -191,7 +195,9 @@
         {
             var randomTimeout =
                 TimeSpan.FromMilliseconds(
-                    this.random.Next(Settings.MinElectionTimeoutMilliseconds, Settings.MaxElectionTimeoutMilliseconds));
+                    this.random.Next(
+                        this.settings.MinElectionTimeoutMilliseconds,
+                        this.settings.MaxElectionTimeoutMilliseconds));
             this.electionTimer?.Dispose();
             this.electionTimer = this.registerTimer(
                 _ => this.local.BecomeCandidate(),

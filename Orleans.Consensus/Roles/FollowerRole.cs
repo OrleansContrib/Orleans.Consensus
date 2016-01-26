@@ -15,7 +15,7 @@
     {
         private readonly IPersistentLog<TOperation> journal;
 
-        private readonly IRoleCoordinator<TOperation> local;
+        private readonly IRoleCoordinator<TOperation> coordinator;
 
         private readonly ILogger logger;
 
@@ -33,24 +33,28 @@
 
         private readonly RegisterTimerDelegate registerTimer;
 
+        private readonly ISettings settings;
+
         public FollowerRole(
             ILogger logger,
-            IRoleCoordinator<TOperation> local,
+            IRoleCoordinator<TOperation> coordinator,
             IPersistentLog<TOperation> journal,
             IStateMachine<TOperation> stateMachine,
             IRaftPersistentState persistentState,
             IRaftVolatileState volatileState,
             IRandom random,
-            RegisterTimerDelegate registerTimer)
+            RegisterTimerDelegate registerTimer,
+            ISettings settings)
         {
             this.logger = logger;
-            this.local = local;
+            this.coordinator = coordinator;
             this.journal = journal;
             this.stateMachine = stateMachine;
             this.persistentState = persistentState;
             this.volatileState = volatileState;
             this.random = random;
             this.registerTimer = registerTimer;
+            this.settings = settings;
         }
 
         public string RoleName => "Follower";
@@ -59,12 +63,12 @@
         {
             this.logger.LogInfo("Becoming follower.");
 
-            this.ResetElectionTimer();
-
-            if (Settings.ApplyEntriesOnFollowers && this.stateMachine != null)
+            if (this.settings.ApplyEntriesOnFollowers && this.stateMachine != null)
             {
                 await this.stateMachine.Reset();
             }
+
+            this.ResetElectionTimer();
         }
 
         public Task<ICollection<LogEntry<TOperation>>> ReplicateOperations(ICollection<TOperation> operations)
@@ -193,7 +197,7 @@
                         request.LeaderCommitIndex,
                         this.journal.LastLogEntryId.Index);
 
-                    if (Settings.ApplyEntriesOnFollowers)
+                    if (this.settings.ApplyEntriesOnFollowers)
                     {
                         // If commitIndex > lastApplied: increment lastApplied, apply log[lastApplied] to state machine(§5.3)
                         await this.ApplyRemainingCommittedEntries();
@@ -217,7 +221,7 @@
             if (this.messagesSinceLastElectionExpiry == 0)
             {
                 this.logger.LogInfo("Election timer expired with no recent messages, becoming candidate.");
-                return this.local.BecomeCandidate();
+                return this.coordinator.BecomeCandidate();
             }
 
             this.logger.LogVerbose($"Election timer expired. {this.messagesSinceLastElectionExpiry} recent messages. ");
@@ -230,7 +234,9 @@
         {
             var randomTimeout =
                 TimeSpan.FromMilliseconds(
-                    this.random.Next(Settings.MinElectionTimeoutMilliseconds, Settings.MaxElectionTimeoutMilliseconds));
+                    this.random.Next(
+                        this.settings.MinElectionTimeoutMilliseconds,
+                        this.settings.MaxElectionTimeoutMilliseconds));
             this.electionTimer?.Dispose();
             this.electionTimer = this.registerTimer(
                 _ => this.ElectionTimerExpired(),
