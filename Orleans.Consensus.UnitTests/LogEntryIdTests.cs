@@ -1,5 +1,7 @@
 ﻿namespace Orleans.Consensus.UnitTests
 {
+    using System;
+
     using FluentAssertions;
 
     using Orleans.Consensus.Contract.Log;
@@ -8,6 +10,14 @@
 
     public class LogEntryIdTests
     {
+        [Fact]
+        public void ParameterValidation()
+        {
+            Assert.Throws<ArgumentOutOfRangeException>(() => new LogEntryId(-1, 0));
+            Assert.Throws<ArgumentOutOfRangeException>(() => new LogEntryId(0, -1));
+            Assert.Throws<ArgumentOutOfRangeException>(() => new LogEntryId(-1, -1));
+        }
+
         /// <summary>
         /// Tests equality between log ids.
         /// </summary>

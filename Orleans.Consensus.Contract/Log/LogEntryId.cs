@@ -9,6 +9,16 @@ namespace Orleans.Consensus.Contract.Log
     {
         public LogEntryId(long term, long index)
         {
+            if (term < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(term), "Term must be >= zero.");
+            }
+
+            if (index < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(index), "Index must be >= zero.");
+            }
+
             this.Term = term;
             this.Index = index;
         }
@@ -78,6 +88,7 @@ namespace Orleans.Consensus.Contract.Log
             {
                 return false;
             }
+
             return obj is LogEntryId && this.Equals((LogEntryId)obj);
         }
 
