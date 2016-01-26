@@ -17,6 +17,6 @@ namespace Orleans.Consensus
 
         Task<AppendResponse> Append(AppendRequest<TOperation> request);
 
-        Task ReplicateAndApplyEntries(List<TOperation> entries);
+        Task ReplicateAndApplyEntries(List<TOperation> operations);
     }
 }

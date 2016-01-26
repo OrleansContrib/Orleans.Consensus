@@ -145,24 +145,22 @@ namespace Orleans.Consensus.Roles
             return new AppendResponse { Success = false, Term = this.persistentState.CurrentTerm };
         }
 
-        public async Task ReplicateAndApplyEntries(List<TOperation> entries)
+        public async Task ReplicateAndApplyEntries(List<TOperation> operations)
         {
-            if (entries?.Count > 0)
+            if (operations?.Count > 0)
             {
-                this.logger.LogInfo($"Replicating {entries.Count} entries to {this.servers.Count} servers");
+                this.logger.LogInfo($"Replicating {operations.Count} entries to {this.servers.Count} servers");
             }
 
-            if (entries != null && entries.Count > 0)
+            if (operations != null && operations.Count > 0)
             {
-                foreach (var entry in entries)
-                {
-                    await
-                        this.journal.AppendOrOverwrite(
-                            new LogEntry<TOperation>(
-                                new LogEntryId(this.persistentState.CurrentTerm, this.journal.LastLogEntryId.Index + 1),
-                                entry));
-                }
+                // Assign each operation an identifier, converting it into a log entry.
+                var nextIndex = this.journal.LastLogEntryId.Index + 1;
+                var entries = operations.Select(
+                    entry =>
+                    new LogEntry<TOperation>(new LogEntryId(this.persistentState.CurrentTerm, nextIndex++), entry));
 
+                await this.journal.AppendOrOverwrite(entries);
                 this.logger.LogInfo($"Leader log is: {this.journal.ProgressString()}");
             }
 

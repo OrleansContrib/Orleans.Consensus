@@ -66,7 +66,7 @@
             }
         }
 
-        public Task ReplicateAndApplyEntries(List<TOperation> entries)
+        public Task ReplicateAndApplyEntries(List<TOperation> operations)
         {
             throw new NotLeaderException(this.volatileState.LeaderId);
         }
@@ -181,11 +181,7 @@
                 }
                 else
                 {
-                    foreach (var entry in request.Entries)
-                    {
-                        // TODO: batch writes.
-                        await this.journal.AppendOrOverwrite(entry);
-                    }
+                    await this.journal.AppendOrOverwrite(request.Entries);
                     this.logger.LogInfo($"Accepted append. Log is now: {this.journal.ProgressString()}");
                 }
 

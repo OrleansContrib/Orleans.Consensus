@@ -115,7 +115,7 @@
             return new AppendResponse { Success = false, Term = this.persistentState.CurrentTerm };
         }
 
-        public Task ReplicateAndApplyEntries(List<TOperation> entries)
+        public Task ReplicateAndApplyEntries(List<TOperation> operations)
         {
             throw new NotLeaderException(this.volatileState.LeaderId);
         }

@@ -103,7 +103,17 @@ namespace Orleans.Consensus.Log
             return false;
         }
 
-        public Task AppendOrOverwrite(LogEntry<TOperation> logEntry)
+        public Task AppendOrOverwrite(IEnumerable<LogEntry<TOperation>> entries)
+        {
+            foreach (var entry in entries)
+            {
+                this.AppendOrOverwrite(entry);
+            }
+
+            return this.WriteCallback?.Invoke() ?? Task.FromResult(0);
+        }
+
+        private void AppendOrOverwrite(LogEntry<TOperation> logEntry)
         {
             if (logEntry.Id.Index > this.LastLogEntryId.Index + 1)
             {
@@ -119,8 +129,6 @@ namespace Orleans.Consensus.Log
             {
                 this.Entries[(int)logEntry.Id.Index - 1] = logEntry;
             }
-
-            return this.WriteCallback?.Invoke() ?? Task.FromResult(0);
         }
     }
 }
