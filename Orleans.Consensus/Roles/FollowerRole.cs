@@ -9,6 +9,7 @@
     using Orleans.Consensus.Contract.Log;
     using Orleans.Consensus.Contract.Messages;
     using Orleans.Consensus.Log;
+    using Orleans.Consensus.State;
 
     internal class FollowerRole<TOperation> : IRaftRole<TOperation>
     {
@@ -23,7 +24,7 @@
         private readonly IRandom random;
 
         private readonly IStateMachine<TOperation> stateMachine;
-        
+
         private readonly IRaftVolatileState volatileState;
 
         private IDisposable electionTimer;
@@ -52,7 +53,7 @@
             this.registerTimer = registerTimer;
         }
 
-        public string State => "Follower";
+        public string RoleName => "Follower";
 
         public async Task Enter()
         {
@@ -66,7 +67,7 @@
             }
         }
 
-        public Task ReplicateAndApplyEntries(List<TOperation> operations)
+        public Task<ICollection<LogEntry<TOperation>>> ReplicateOperations(ICollection<TOperation> operations)
         {
             throw new NotLeaderException(this.volatileState.LeaderId);
         }

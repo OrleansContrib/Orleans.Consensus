@@ -15,6 +15,10 @@ namespace Orleans.Consensus.Actors
         /// </summary>
         public const int MaxLogEntriesPerAppendRequest = 10;
 
+        /// <summary>
+        /// Gets a value indicating whether or not committed operations should be applied to the state machine on a
+        /// server which is currently a follower.
+        /// </summary>
         public static bool ApplyEntriesOnFollowers { get; } = false;
     }
 }

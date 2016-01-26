@@ -9,6 +9,7 @@
     using Orleans.Consensus.Contract;
     using Orleans.Consensus.Contract.Log;
     using Orleans.Consensus.Contract.Messages;
+    using Orleans.Consensus.State;
 
     internal class CandidateRole<TOperation> : IRaftRole<TOperation>
     {
@@ -62,7 +63,7 @@
             this.membershipProvider = membershipProvider;
         }
 
-        public string State => "Candidate";
+        public string RoleName => "Candidate";
 
         public async Task Enter()
         {
@@ -115,7 +116,7 @@
             return new AppendResponse { Success = false, Term = this.persistentState.CurrentTerm };
         }
 
-        public Task ReplicateAndApplyEntries(List<TOperation> operations)
+        public Task<ICollection<LogEntry<TOperation>>> ReplicateOperations(ICollection<TOperation> operations)
         {
             throw new NotLeaderException(this.volatileState.LeaderId);
         }

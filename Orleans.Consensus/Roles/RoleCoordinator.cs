@@ -1,4 +1,4 @@
-namespace Orleans.Consensus.Actors
+namespace Orleans.Consensus.Roles
 {
     using System;
     using System.Linq;
@@ -6,8 +6,9 @@ namespace Orleans.Consensus.Actors
 
     using Autofac;
 
+    using Orleans.Consensus.Actors;
     using Orleans.Consensus.Contract.Messages;
-    using Orleans.Consensus.Roles;
+    using Orleans.Consensus.State;
 
     public class RoleCoordinator<TOperation> : IRoleCoordinator<TOperation>
     {

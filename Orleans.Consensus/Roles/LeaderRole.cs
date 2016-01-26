@@ -17,6 +17,7 @@ namespace Orleans.Consensus.Roles
     using Orleans.Consensus.Contract.Log;
     using Orleans.Consensus.Contract.Messages;
     using Orleans.Consensus.Log;
+    using Orleans.Consensus.State;
 
     internal class LeaderRole<TOperation> : IRaftRole<TOperation>
     {
@@ -80,7 +81,7 @@ namespace Orleans.Consensus.Roles
 
         private int QuorumSize => (this.servers.Count + 1) / 2;
 
-        public string State => "Leader";
+        public string RoleName => "Leader";
 
         public async Task Enter()
         {
@@ -145,8 +146,9 @@ namespace Orleans.Consensus.Roles
             return new AppendResponse { Success = false, Term = this.persistentState.CurrentTerm };
         }
 
-        public async Task ReplicateAndApplyEntries(List<TOperation> operations)
+        public async Task<ICollection<LogEntry<TOperation>>> ReplicateOperations(ICollection<TOperation> operations)
         {
+            ICollection<LogEntry<TOperation>> entries;
             if (operations?.Count > 0)
             {
                 this.logger.LogInfo($"Replicating {operations.Count} entries to {this.servers.Count} servers");
@@ -156,12 +158,18 @@ namespace Orleans.Consensus.Roles
             {
                 // Assign each operation an identifier, converting it into a log entry.
                 var nextIndex = this.journal.LastLogEntryId.Index + 1;
-                var entries = operations.Select(
-                    entry =>
-                    new LogEntry<TOperation>(new LogEntryId(this.persistentState.CurrentTerm, nextIndex++), entry));
+                entries =
+                    operations.Select(
+                        entry =>
+                        new LogEntry<TOperation>(new LogEntryId(this.persistentState.CurrentTerm, nextIndex++), entry))
+                        .ToList();
 
                 await this.journal.AppendOrOverwrite(entries);
                 this.logger.LogInfo($"Leader log is: {this.journal.ProgressString()}");
+            }
+            else
+            {
+                entries = null;
             }
 
             var tasks = new List<Task>(this.servers.Count);
@@ -174,14 +182,15 @@ namespace Orleans.Consensus.Roles
 
                 tasks.Add(this.AppendEntriesOnServer(server.Key, server.Value));
             }
-
-            // TODO: return a task which completes when the operation is committed.
+            
             await Task.WhenAll(tasks);
             if (this.madeProgress)
             {
                 await this.UpdateCommittedIndex();
                 this.madeProgress = false;
             }
+
+            return entries;
         }
 
         public Task SendHeartBeats()
@@ -201,7 +210,7 @@ namespace Orleans.Consensus.Roles
                 }
 
                 // Send a heartbeat to the server.
-                this.ReplicateAndApplyEntries(null).Ignore();
+                this.ReplicateOperations(null).Ignore();
             }
 
             return Task.FromResult(0);

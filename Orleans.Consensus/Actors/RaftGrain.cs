@@ -11,6 +11,7 @@ namespace Orleans.Consensus.Actors
     using Orleans.Consensus.Contract.Messages;
     using Orleans.Consensus.Log;
     using Orleans.Consensus.Roles;
+    using Orleans.Consensus.State;
     using Orleans.Consensus.Utilities;
     using Orleans.Providers;
     using Orleans.Runtime;
@@ -47,13 +48,13 @@ namespace Orleans.Consensus.Actors
 
         protected Task AppendEntry(TOperation entry)
         {
-            return this.coordinator.Role.ReplicateAndApplyEntries(new List<TOperation> { entry });
+            return this.coordinator.Role.ReplicateOperations(new List<TOperation> { entry });
         }
 
         private string GetLogMessage(string message)
         {
             return
-                $"[{this.coordinator.Role.State} in term {this.persistentState.CurrentTerm}, LastLog: ({this.journal.LastLogEntryId})] {message}";
+                $"[{this.coordinator.Role.RoleName} in term {this.persistentState.CurrentTerm}, LastLog: ({this.journal.LastLogEntryId})] {message}";
         }
 
         /// <summary>
