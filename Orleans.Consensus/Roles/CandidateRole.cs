@@ -10,6 +10,7 @@
     using Orleans.Consensus.Contract.Log;
     using Orleans.Consensus.Contract.Messages;
     using Orleans.Consensus.State;
+    using Orleans.Consensus.Utilities;
 
     internal class CandidateRole<TOperation> : IRaftRole<TOperation>
     {

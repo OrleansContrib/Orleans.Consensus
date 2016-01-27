@@ -126,7 +126,7 @@
     <Compile Include="Roles\FollowerRole.cs" />
     <Compile Include="Roles\LeaderRole.cs" />
     <Compile Include="Settings.cs" />
-    <Compile Include="CancellationTokenExtensions.cs" />
+    <Compile Include="Utilities\CancellationTokenExtensions.cs" />
     <Compile Include="Log\InMemoryLog.cs" />
     <Compile Include="Roles\IRaftRole.cs" />
     <Compile Include="IStateMachine.cs" />
