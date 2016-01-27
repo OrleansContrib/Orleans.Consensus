@@ -78,6 +78,7 @@ namespace Orleans.Consensus.Actors
             this.container = applicationContainer.BeginLifetimeScope(
                 builder =>
                 {
+                    builder.RegisterType<Settings>().As<ISettings>().SingleInstance().PreserveExistingDefaults();
                     builder.RegisterInstance(this.GrainFactory).SingleInstance().PreserveExistingDefaults();
                     builder.Register<IServerIdentity>(_ => new ServerIdentity { Id = this.GetPrimaryKeyString() })
                         .SingleInstance()
