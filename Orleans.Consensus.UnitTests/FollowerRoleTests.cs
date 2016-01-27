@@ -5,11 +5,8 @@ namespace Orleans.Consensus.UnitTests
 {
     using System.Collections.Generic;
     using System.Linq;
-    using System.Threading;
 
     using Autofac;
-
-    using AutofacContrib.NSubstitute;
 
     using FluentAssertions;
 
