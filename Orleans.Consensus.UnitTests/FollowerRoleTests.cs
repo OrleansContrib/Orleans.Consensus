@@ -1,12 +1,11 @@
-﻿using System;
-using System.Threading.Tasks;
-
-namespace Orleans.Consensus.UnitTests
+﻿namespace Orleans.Consensus.UnitTests
 {
+    using System;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Threading.Tasks;
 
-    using Autofac;
+    using AutofacContrib.NSubstitute;
 
     using FluentAssertions;
 
@@ -16,6 +15,7 @@ namespace Orleans.Consensus.UnitTests
     using Orleans.Consensus.Contract;
     using Orleans.Consensus.Contract.Log;
     using Orleans.Consensus.Contract.Messages;
+    using Orleans.Consensus.Log;
     using Orleans.Consensus.Roles;
     using Orleans.Consensus.State;
     using Orleans.Consensus.UnitTests.Utilities;
@@ -31,65 +31,56 @@ namespace Orleans.Consensus.UnitTests
 
         private const int RiggedRandomResult = 440;
 
-        private readonly ISettings settings;
+        private readonly IRoleCoordinator<int> coordinator;
+
+        private readonly InMemoryLog<int> journal;
+
+        private readonly IRaftPersistentState persistentState;
 
         private readonly IRandom random;
 
-        private readonly IRoleCoordinator<int> coordinator;
+        private readonly FollowerRole<int> role;
+
+        private readonly ISettings settings;
 
         private readonly IStateMachine<int> stateMachine;
 
         private readonly MockTimers timers;
 
-        private readonly FollowerRole<int> role;
-
-        private readonly IRaftPersistentState persistentState;
-
-        private readonly IPersistentLog<int> journal;
-
-        private readonly IContainer container;
-
         public FollowerRoleTests(ITestOutputHelper output)
         {
-            var builder = new ContainerBuilder();
-            builder.RegisterInstance<ILogger>(new TestLogger(output));
+            var builder = new AutoSubstitute();
+            builder.Provide<ILogger>(new TestLogger(output));
 
             // Configure settings
-            this.settings = Substitute.For<ISettings>();
+            this.settings = builder.Resolve<ISettings>();
             this.settings.ApplyEntriesOnFollowers.Returns(true);
             this.settings.MinElectionTimeoutMilliseconds.Returns(MinElectionTime);
             this.settings.MaxElectionTimeoutMilliseconds.Returns(MaxElectionTime);
 
             // Rig random number generator to always return the same value.
-            this.random = Substitute.For<IRandom>();
+            this.random = builder.Resolve<IRandom>();
             this.random.Next(Arg.Any<int>(), Arg.Any<int>()).Returns(RiggedRandomResult);
-            builder.RegisterInstance(this.random);
 
-            this.coordinator = Substitute.For<IRoleCoordinator<int>>();
-            builder.RegisterInstance(this.coordinator);
-
-            this.stateMachine = Substitute.For<IStateMachine<int>>();
-            builder.RegisterInstance(this.stateMachine);
+            this.coordinator = builder.Resolve<IRoleCoordinator<int>>();
+            this.stateMachine = builder.Resolve<IStateMachine<int>>();
 
             this.timers = new MockTimers();
-            builder.RegisterInstance<RegisterTimerDelegate>(this.timers.RegisterTimer);
+            builder.Provide<RegisterTimerDelegate>(this.timers.RegisterTimer);
 
-            this.persistentState = Substitute.For<IRaftPersistentState>();
-            builder.RegisterInstance(this.persistentState);
-
-            this.journal = Substitute.For<IPersistentLog<int>>();
-            builder.RegisterInstance(this.journal);
+            this.persistentState = builder.Resolve<IRaftPersistentState>();
+            this.journal = Substitute.ForPartsOf<InMemoryLog<int>>();
+            builder.Provide<IPersistentLog<int>>(this.journal);
 
             // After the container is configured, resolve required services.
-            this.container = builder.Build();
-            this.role = this.container.Resolve<FollowerRole<int>>();
+            this.role = builder.Resolve<FollowerRole<int>>();
         }
 
         [Fact]
         public async Task EntryStartsElectionTimer()
         {
             await this.role.Enter();
-            
+
             // The state machine should have been reset.
             await this.stateMachine.Received().Reset();
 
@@ -98,7 +89,8 @@ namespace Orleans.Consensus.UnitTests
 
             // Check that the correct timer was registered.
             var timer = this.timers[0];
-            this.random.Received().Next(MinElectionTime, MaxElectionTime);
+            this.random.Received()
+                .Next(this.settings.MinElectionTimeoutMilliseconds, this.settings.MaxElectionTimeoutMilliseconds);
             timer.DueTime.Should().Be(TimeSpan.FromMilliseconds(RiggedRandomResult));
             timer.Period.Should().Be(TimeSpan.FromMilliseconds(RiggedRandomResult));
             timer.Disposable.Disposed.Should().BeFalse();
@@ -126,7 +118,6 @@ namespace Orleans.Consensus.UnitTests
 
             // Receive a valid append message.
             this.persistentState.CurrentTerm.Returns(_ => 1);
-            this.journal.Contains(default(LogEntryId)).Returns(true);
             var response = await this.role.Append(new AppendRequest<int> { Term = 1 });
             response.Success.Should().BeTrue();
 
@@ -143,34 +134,31 @@ namespace Orleans.Consensus.UnitTests
         [Fact]
         public async Task ValidEntriesAreWrittenToLog()
         {
-            // Setup: capture log entries written
-            List<LogEntry<int>> actualEntries = null;
-            this.journal.AppendOrOverwrite(Arg.Any<IEnumerable<LogEntry<int>>>())
-                .Returns(Task.FromResult(0))
-                .AndDoes(_ => actualEntries = ((IEnumerable<LogEntry<int>>)_[0]).ToList());
+            this.persistentState.CurrentTerm.Returns(_ => 1);
+            this.journal.Entries.Add(new LogEntry<int>(new LogEntryId(1, 1), 27));
 
             // Become a follower
             await this.role.Enter();
 
-            // Receive a valid append message.
-            this.persistentState.CurrentTerm.Returns(_ => 1);
-            var previous = new LogEntryId(1, 2);
-            this.journal.Contains(previous).Returns(true);
-
-            // Append the entry 1.3 with a payload of 38
+            // Append some entries.
             var expectedEntries = new List<LogEntry<int>>
             {
-                new LogEntry<int>(new LogEntryId(1, 3), 38),
-                new LogEntry<int>(new LogEntryId(1, 5), 98)
+                new LogEntry<int>(new LogEntryId(1, 2), 38),
+                new LogEntry<int>(new LogEntryId(1, 3), 98)
             };
-            var request = new AppendRequest<int> { Term = 1, PreviousLogEntry = previous, Entries = expectedEntries };
+            var request = new AppendRequest<int>
+            {
+                Term = 1,
+                PreviousLogEntry = this.journal.LastLogEntryId,
+                Entries = expectedEntries
+            };
             var response = await this.role.Append(request);
 
             // Check that the call completed successfully and that the correct entry was written to the underlying log.
             response.Success.Should().BeTrue();
             response.Term.Should().Be(1);
             await this.journal.Received().AppendOrOverwrite(Arg.Any<IEnumerable<LogEntry<int>>>());
-            actualEntries.Should().BeEquivalentTo(expectedEntries);
+            this.journal.Entries.Skip(1).Should().BeEquivalentTo(expectedEntries);
         }
     }
 }

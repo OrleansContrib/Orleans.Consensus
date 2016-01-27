@@ -112,6 +112,7 @@
   <ItemGroup>
     <Compile Include="Actors\IMembershipProvider.cs" />
     <Compile Include="ISettings.cs" />
+    <Compile Include="Utilities\PersistentLogExtensions.cs" />
     <Compile Include="State\IRaftPersistentState.cs" />
     <Compile Include="State\IRaftVolatileState.cs" />
     <Compile Include="Roles\IRoleCoordinator.cs" />

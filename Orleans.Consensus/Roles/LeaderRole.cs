@@ -18,6 +18,7 @@ namespace Orleans.Consensus.Roles
     using Orleans.Consensus.Contract.Messages;
     using Orleans.Consensus.Log;
     using Orleans.Consensus.State;
+    using Orleans.Consensus.Utilities;
 
     internal class LeaderRole<TOperation> : IRaftRole<TOperation>
     {

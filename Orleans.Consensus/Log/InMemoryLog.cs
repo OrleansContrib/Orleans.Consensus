@@ -2,20 +2,15 @@ namespace Orleans.Consensus.Log
 {
     using System;
     using System.Collections.Generic;
+    using System.Diagnostics.CodeAnalysis;
     using System.Linq;
     using System.Threading.Tasks;
 
     using Orleans.Consensus.Contract.Log;
 
-    public static class PersistentLogExtensions
-    {
-        public static string ProgressString<TOperation>(this IPersistentLog<TOperation> log)
-        {
-            return $"[{string.Join(", ", log.GetCursor(0).Select(_ => _.Id))}]";
-        }
-    }
-
     [Serializable]
+    [SuppressMessage("ReSharper", "ClassWithVirtualMembersNeverInherited.Global",
+        Justification = "Test classes override virtual methods.")]
     public class InMemoryLog<TOperation> : IPersistentLog<TOperation>
     {
         [NonSerialized]
@@ -23,7 +18,7 @@ namespace Orleans.Consensus.Log
 
         internal List<LogEntry<TOperation>> Entries { get; } = new List<LogEntry<TOperation>>();
 
-        public Func<Task> WriteCallback
+        public virtual Func<Task> WriteCallback
         {
             get
             {
@@ -35,9 +30,9 @@ namespace Orleans.Consensus.Log
             }
         }
 
-        public IEnumerable<LogEntry<TOperation>> GetReverseCursor() => Enumerable.Reverse(this.Entries);
+        public virtual IEnumerable<LogEntry<TOperation>> GetReverseCursor() => Enumerable.Reverse(this.Entries);
 
-        public LogEntryId LastLogEntryId
+        public virtual LogEntryId LastLogEntryId
         {
             get
             {
@@ -50,17 +45,17 @@ namespace Orleans.Consensus.Log
             }
         }
 
-        public LogEntry<TOperation> Get(long index)
+        public virtual LogEntry<TOperation> Get(long index)
         {
             return this.Entries[(int)index - 1];
         }
 
-        public IEnumerable<LogEntry<TOperation>> GetCursor(long fromIndex)
+        public virtual IEnumerable<LogEntry<TOperation>> GetCursor(long fromIndex)
         {
             return this.Entries.Skip((int)fromIndex);
         }
 
-        public bool Contains(LogEntryId entryId)
+        public virtual bool Contains(LogEntryId entryId)
         {
             // The log starts at index 1, index 0 is implicitly included.
             if (entryId.Index == 0)
@@ -81,7 +76,7 @@ namespace Orleans.Consensus.Log
             return true;
         }
 
-        public bool ConflictsWith(LogEntryId entryId)
+        public virtual bool ConflictsWith(LogEntryId entryId)
         {
             if (this.LastLogEntryId == entryId)
             {
@@ -103,7 +98,7 @@ namespace Orleans.Consensus.Log
             return false;
         }
 
-        public Task AppendOrOverwrite(IEnumerable<LogEntry<TOperation>> entries)
+        public virtual Task AppendOrOverwrite(IEnumerable<LogEntry<TOperation>> entries)
         {
             foreach (var entry in entries)
             {
