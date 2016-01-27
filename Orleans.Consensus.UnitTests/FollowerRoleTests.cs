@@ -5,13 +5,15 @@ namespace Orleans.Consensus.UnitTests
 {
     using System.Collections.Generic;
     using System.Linq;
+    using System.Threading;
+
+    using Autofac;
 
     using AutofacContrib.NSubstitute;
 
     using FluentAssertions;
 
     using NSubstitute;
-    using NSubstitute.ReturnsExtensions;
 
     using Orleans.Consensus.Actors;
     using Orleans.Consensus.Contract;
@@ -26,6 +28,12 @@ namespace Orleans.Consensus.UnitTests
 
     public class FollowerRoleTests
     {
+        private const int MinElectionTime = 72;
+
+        private const int MaxElectionTime = 720;
+
+        private const int RiggedRandomResult = 440;
+
         private readonly ISettings settings;
 
         private readonly IRandom random;
@@ -40,41 +48,43 @@ namespace Orleans.Consensus.UnitTests
 
         private readonly IRaftPersistentState persistentState;
 
-        private readonly AutoSubstitute container;
-
         private readonly IPersistentLog<int> journal;
+
+        private readonly IContainer container;
 
         public FollowerRoleTests(ITestOutputHelper output)
         {
-            this.container = new AutoSubstitute();
-            this.container.Provide<ILogger>(new TestLogger(output));
+            var builder = new ContainerBuilder();
+            builder.RegisterInstance<ILogger>(new TestLogger(output));
 
             // Configure settings
-            this.settings = this.container.Resolve<ISettings>();
+            this.settings = Substitute.For<ISettings>();
             this.settings.ApplyEntriesOnFollowers.Returns(true);
-            this.settings.MinElectionTimeoutMilliseconds.Returns(72);
-            this.settings.MaxElectionTimeoutMilliseconds.Returns(720);
+            this.settings.MinElectionTimeoutMilliseconds.Returns(MinElectionTime);
+            this.settings.MaxElectionTimeoutMilliseconds.Returns(MaxElectionTime);
 
             // Rig random number generator to always return the same value.
-            this.random = this.container.Resolve<IRandom>();
-            this.random.Next(Arg.Any<int>(), Arg.Any<int>()).Returns(440);
+            this.random = Substitute.For<IRandom>();
+            this.random.Next(Arg.Any<int>(), Arg.Any<int>()).Returns(RiggedRandomResult);
+            builder.RegisterInstance(this.random);
 
             this.coordinator = Substitute.For<IRoleCoordinator<int>>();
-            this.container.Provide(this.coordinator);
+            builder.RegisterInstance(this.coordinator);
 
             this.stateMachine = Substitute.For<IStateMachine<int>>();
-            this.container.Provide(this.stateMachine);
+            builder.RegisterInstance(this.stateMachine);
 
             this.timers = new MockTimers();
-            this.container.Provide<RegisterTimerDelegate>(this.timers.RegisterTimer);
+            builder.RegisterInstance<RegisterTimerDelegate>(this.timers.RegisterTimer);
 
             this.persistentState = Substitute.For<IRaftPersistentState>();
-            this.container.Provide(this.persistentState);
+            builder.RegisterInstance(this.persistentState);
 
             this.journal = Substitute.For<IPersistentLog<int>>();
-            this.container.Provide(this.journal);
+            builder.RegisterInstance(this.journal);
 
             // After the container is configured, resolve required services.
+            this.container = builder.Build();
             this.role = this.container.Resolve<FollowerRole<int>>();
         }
 
@@ -91,9 +101,9 @@ namespace Orleans.Consensus.UnitTests
 
             // Check that the correct timer was registered.
             var timer = this.timers[0];
-            this.random.Received().Next(72, 720);
-            timer.DueTime.Should().Be(TimeSpan.FromMilliseconds(440));
-            timer.Period.Should().Be(TimeSpan.FromMilliseconds(440));
+            this.random.Received().Next(MinElectionTime, MaxElectionTime);
+            timer.DueTime.Should().Be(TimeSpan.FromMilliseconds(RiggedRandomResult));
+            timer.Period.Should().Be(TimeSpan.FromMilliseconds(RiggedRandomResult));
             timer.Disposable.Disposed.Should().BeFalse();
 
             // Check that the timer causes the instance to become a candidate.
