@@ -8,15 +8,16 @@ namespace Orleans.Consensus.Contract.Log
     [Serializable]
     public struct LogEntry<TOperation>
     {
+
         public LogEntry(LogEntryId entryId, TOperation operation)
         {
             this.Id = entryId;
             this.Operation = operation;
         }
 
-        public TOperation Operation { get; }
+        public TOperation Operation { get; set; }
 
-        public LogEntryId Id { get; }
+        public LogEntryId Id { get; set; }
 
         /// <summary>
         /// Returns the fully qualified type name of this instance.

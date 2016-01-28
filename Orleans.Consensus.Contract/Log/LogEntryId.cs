@@ -7,6 +7,8 @@ namespace Orleans.Consensus.Contract.Log
     [Immutable]
     public struct LogEntryId : IEquatable<LogEntryId>, IComparable<LogEntryId>
     {
+       
+
         public LogEntryId(long term, long index)
         {
             if (term < 0)
@@ -23,8 +25,8 @@ namespace Orleans.Consensus.Contract.Log
             this.Index = index;
         }
 
-        public long Term { get; }
-        public long Index { get; }
+        public long Term { get; set; }
+        public long Index { get; set; }
 
         /// <summary>
         /// Compares the current object with another object of the same type.
