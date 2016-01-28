@@ -130,8 +130,13 @@
 
                     voteGranted = true;
 
-                    // Record that the vote is being granted.
-                    await this.persistentState.UpdateTermAndVote(request.Candidate, request.Term);
+                    // If a vote has not yet been granted for this candidate in the current term,
+                    // record that the vote is being granted and update the term.
+                    if (this.persistentState.VotedFor != request.Candidate
+                        || this.persistentState.CurrentTerm != request.Term)
+                    {
+                        await this.persistentState.UpdateTermAndVote(request.Candidate, request.Term);
+                    }
                 }
             }
 
