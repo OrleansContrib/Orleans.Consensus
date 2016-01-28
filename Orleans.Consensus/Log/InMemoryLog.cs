@@ -76,28 +76,6 @@ namespace Orleans.Consensus.Log
             return true;
         }
 
-        public virtual bool ConflictsWith(LogEntryId entryId)
-        {
-            if (this.LastLogEntryId == entryId)
-            {
-                return false;
-            }
-
-            // If the entry is after all current entries, the log does not conflict.
-            if (this.LastLogEntryId.Index < entryId.Index || entryId.Index == 0)
-            {
-                return false;
-            }
-
-            // If the term for the specified entry index differs, the log conflicts.
-            if (this.Entries[(int)entryId.Index - 1].Id.Term != entryId.Term)
-            {
-                return true;
-            }
-
-            return false;
-        }
-
         public virtual Task AppendOrOverwrite(IEnumerable<LogEntry<TOperation>> entries)
         {
             foreach (var entry in entries)
@@ -116,14 +94,15 @@ namespace Orleans.Consensus.Log
                     $"Cannot append entry {logEntry.Id} because it is greater than the next index, {this.LastLogEntryId.Index + 1}.");
             }
 
-            if (logEntry.Id.Index == this.LastLogEntryId.Index + 1)
+
+            // 3. If an existing entry conflicts with a new one (same index but different terms),
+            // delete the existing entry and all that follow it (§5.3)
+            if (this.Entries.Count >= logEntry.Id.Index)
             {
-                this.Entries.Add(logEntry);
+                this.Entries.RemoveRange((int)logEntry.Id.Index - 1, this.Entries.Count - (int)logEntry.Id.Index + 1);
             }
-            else
-            {
-                this.Entries[(int)logEntry.Id.Index - 1] = logEntry;
-            }
+
+            this.Entries.Add(logEntry);
         }
     }
 }
