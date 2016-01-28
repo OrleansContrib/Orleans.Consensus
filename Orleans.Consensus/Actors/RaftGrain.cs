@@ -71,39 +71,48 @@ namespace Orleans.Consensus.Actors
             var allServers = new[] { "one", "two", "three" };
 
             var applicationContainerBuilder = new ContainerBuilder();
-            /* in a common location, build the application services */
+
+            // TODO: Move these registrations into a module.
+            applicationContainerBuilder.RegisterType<Settings>().As<ISettings>().SingleInstance().PreserveExistingDefaults();
+            applicationContainerBuilder.RegisterType<StaticMembershipProvider>()
+                .OnActivated(_ => _.Instance.SetServers(allServers))
+                .SingleInstance()
+                .AsImplementedInterfaces()
+                .PreserveExistingDefaults();
+            applicationContainerBuilder.RegisterType<VolatileState>()
+                .SingleInstance()
+                .AsImplementedInterfaces()
+                .PreserveExistingDefaults();
+            applicationContainerBuilder.RegisterType<RoleCoordinator<TOperation>>()
+                .InstancePerLifetimeScope()
+                .AsImplementedInterfaces()
+                .PreserveExistingDefaults();
+            applicationContainerBuilder.Register<IRandom>(_ => ConcurrentRandom.Instance)
+                .SingleInstance()
+                .PreserveExistingDefaults();
+
+            // Register roles.
+            applicationContainerBuilder.RegisterType<FollowerRole<TOperation>>().PreserveExistingDefaults();
+            applicationContainerBuilder.RegisterType<CandidateRole<TOperation>>().PreserveExistingDefaults();
+            applicationContainerBuilder.RegisterType<LeaderRole<TOperation>>().PreserveExistingDefaults();
+
             var applicationContainer = applicationContainerBuilder.Build();
 
             // Build the container for this grain's scope.
             this.container = applicationContainer.BeginLifetimeScope(
                 builder =>
                 {
-                    builder.RegisterType<Settings>().As<ISettings>().SingleInstance().PreserveExistingDefaults();
                     builder.RegisterInstance(this.GrainFactory).SingleInstance().PreserveExistingDefaults();
                     builder.Register<IServerIdentity>(_ => new ServerIdentity { Id = this.GetPrimaryKeyString() })
                         .SingleInstance()
-                        .PreserveExistingDefaults();
-
-                    builder.RegisterType<StaticMembershipProvider>()
-                        .OnActivated(_ => _.Instance.SetServers(allServers))
-                        .SingleInstance()
-                        .AsImplementedInterfaces()
-                        .PreserveExistingDefaults();
-                    builder.RegisterType<VolatileState>()
-                        .SingleInstance()
-                        .AsImplementedInterfaces()
                         .PreserveExistingDefaults();
 
                     builder.Register(_ => new OrleansLogger(this.log) { FormatMessage = this.GetLogMessage })
                         .SingleInstance()
                         .AsImplementedInterfaces()
                         .PreserveExistingDefaults();
-                    builder.RegisterType<RoleCoordinator<TOperation>>()
-                        .SingleInstance()
-                        .AsImplementedInterfaces()
-                        .PreserveExistingDefaults();
-                    builder.RegisterInstance<RegisterTimerDelegate>(this.RegisterTimer).SingleInstance().PreserveExistingDefaults();
-                    builder.Register<IRandom>(_ => ConcurrentRandom.Instance)
+
+                    builder.RegisterInstance<RegisterTimerDelegate>(this.RegisterTimer)
                         .SingleInstance()
                         .PreserveExistingDefaults();
 
@@ -117,12 +126,7 @@ namespace Orleans.Consensus.Actors
                         .SingleInstance()
                         .As<IPersistentLog<TOperation>>()
                         .PreserveExistingDefaults();
-
-                    // Register roles.
-                    builder.RegisterType<FollowerRole<TOperation>>().PreserveExistingDefaults();
-                    builder.RegisterType<CandidateRole<TOperation>>().PreserveExistingDefaults();
-                    builder.RegisterType<LeaderRole<TOperation>>().PreserveExistingDefaults();
-
+                    
                     // The consumer typically provides their own state machine, so register the method used to retrieve
                     // it.
                     builder.Register(this.GetStateMachine);

@@ -11,6 +11,7 @@
     using Orleans.Consensus.Contract.Messages;
     using Orleans.Consensus.Log;
     using Orleans.Consensus.State;
+    using Orleans.Consensus.Utilities;
 
     internal class FollowerRole<TOperation> : IRaftRole<TOperation>
     {
@@ -129,8 +130,13 @@
 
                     voteGranted = true;
 
-                    // Record that the vote is being granted.
-                    await this.persistentState.UpdateTermAndVote(request.Candidate, request.Term);
+                    // If a vote has not yet been granted for this candidate in the current term,
+                    // record that the vote is being granted and update the term.
+                    if (this.persistentState.VotedFor != request.Candidate
+                        || this.persistentState.CurrentTerm != request.Term)
+                    {
+                        await this.persistentState.UpdateTermAndVote(request.Candidate, request.Term);
+                    }
                 }
             }
 
@@ -163,16 +169,6 @@
                     + $"Local: {this.journal.ProgressString()}");
                 success = false;
             }
-            // 3. If an existing entry conflicts with a new one (same index but different terms),
-            // delete the existing entry and all that follow it (§5.3)
-            else if (this.journal.ConflictsWith(request.PreviousLogEntry))
-            {
-                this.messagesSinceLastElectionExpiry++;
-                this.logger.LogWarn(
-                    $"Denying append {request}: Previous log entry {request.PreviousLogEntry} conflicts with "
-                    + $"local log: {this.journal.ProgressString()}");
-                success = false;
-            }
             else
             {
                 this.messagesSinceLastElectionExpiry++;
@@ -180,13 +176,15 @@
                 // Set the current leader, so that clients can be redirected.
                 this.volatileState.LeaderId = request.Leader;
 
-                // 4. Append any new entries not already in the log.
                 if (request.Entries == null || request.Entries.Count == 0)
                 {
                     //this.journalInfo($"heartbeat from {request.Leader}.");
                 }
                 else
                 {
+                    // 3. If an existing entry conflicts with a new one (same index but different terms),
+                    // delete the existing entry and all that follow it (§5.3)
+                    // 4. Append any new entries not already in the log.
                     await this.journal.AppendOrOverwrite(request.Entries);
                     this.logger.LogInfo($"Accepted append. Log is now: {this.journal.ProgressString()}");
                 }

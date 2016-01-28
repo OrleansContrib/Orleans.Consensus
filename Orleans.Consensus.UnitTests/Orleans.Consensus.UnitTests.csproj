@@ -84,6 +84,7 @@
     <Compile Include="Utilities\Disposable.cs" />
     <Compile Include="FollowerRoleTests.cs" />
     <Compile Include="LogEntryIdTests.cs" />
+    <Compile Include="Utilities\InMemoryPersistentState.cs" />
     <Compile Include="Utilities\MockTimers.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Utilities\TestLogger.cs" />

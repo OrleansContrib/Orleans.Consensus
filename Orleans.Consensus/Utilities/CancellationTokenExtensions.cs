@@ -1,4 +1,4 @@
-﻿namespace Orleans.Consensus
+﻿namespace Orleans.Consensus.Utilities
 {
     using System.Threading;
     using System.Threading.Tasks;

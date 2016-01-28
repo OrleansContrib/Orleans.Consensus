@@ -42,10 +42,7 @@
             log.Contains(new LogEntryId(1,4)).Should().BeFalse();
             log.Contains(new LogEntryId(2, 1)).Should().BeFalse();
 
-            log.ConflictsWith(new LogEntryId(1, 4)).Should().BeFalse();
-            log.ConflictsWith(new LogEntryId(2, 4)).Should().BeFalse();
-            log.ConflictsWith(new LogEntryId(1, 3)).Should().BeFalse();
-            log.ConflictsWith(new LogEntryId(2, 3)).Should().BeTrue();
+          
 
             var entry2 = log.Get(2);
             entry2.Id.Should().Be(new LogEntryId(1, 2));
@@ -68,7 +65,7 @@
         {
 
             log.Contains(new LogEntryId(1, 4)).Should().BeFalse();
-            log.ConflictsWith(new LogEntryId(1, 4)).Should().BeFalse();
+        
 
             Assert.Throws<ArgumentOutOfRangeException>(() => log.Get(2));
 

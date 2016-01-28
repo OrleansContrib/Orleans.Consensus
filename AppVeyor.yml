@@ -1,0 +1,5 @@
+build:
+  project: Orleans.Consensus.sln
+
+before_build:
+  cmd: nuget restore Orleans.Consensus.sln

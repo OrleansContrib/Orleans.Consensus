@@ -120,6 +120,7 @@
     <Compile Include="Log\ISerializer.cs" />
     <Compile Include="Log\ProtobufSerializer.cs" />
     <Compile Include="Log\StreamLog.cs" />
+    <Compile Include="Utilities\PersistentLogExtensions.cs" />
     <Compile Include="State\IRaftPersistentState.cs" />
     <Compile Include="State\IRaftVolatileState.cs" />
     <Compile Include="Roles\IRoleCoordinator.cs" />
@@ -134,7 +135,7 @@
     <Compile Include="Roles\FollowerRole.cs" />
     <Compile Include="Roles\LeaderRole.cs" />
     <Compile Include="Settings.cs" />
-    <Compile Include="CancellationTokenExtensions.cs" />
+    <Compile Include="Utilities\CancellationTokenExtensions.cs" />
     <Compile Include="Log\InMemoryLog.cs" />
     <Compile Include="Roles\IRaftRole.cs" />
     <Compile Include="IStateMachine.cs" />
