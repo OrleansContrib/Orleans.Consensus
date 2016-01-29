@@ -177,7 +177,7 @@
                         $"Received {this.votes} votes as candidate for term {this.persistentState.CurrentTerm}.");
 
                     // If votes received from majority of servers: become leader (§5.2)
-                    if (this.votes > this.membershipProvider.OtherServers.Count / 2)
+                    if (this.votes >= this.QuorumSize)
                     {
                         this.logger.LogInfo(
                             $"Becoming leader for term {this.persistentState.CurrentTerm} with {this.votes}/{this.membershipProvider.OtherServers.Count + 1} votes.");
@@ -189,6 +189,14 @@
                 {
                     this.logger.LogWarn($"Exception from {nameof(this.RequestVote)}: {exception}");
                 }
+            }
+        }
+
+        private int QuorumSize
+        {
+            get
+            {
+                return this.membershipProvider.OtherServers.Count / 2;
             }
         }
 
