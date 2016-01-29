@@ -7,13 +7,27 @@
     using FluentAssertions;
     using System.Linq;
     using System;
+    using ProtoBuf.Meta;
     public class PersistentLogTests
     {
-        
+
+        static ProtobufSerializer<LogEntry<TestOperation>> CreateSerializer()
+        {
+            var model = TypeModel.Create();
+            model.Add(typeof(MutableLogEntry<TestOperation>), false).Add(Array.ConvertAll(typeof(MutableLogEntry<TestOperation>).GetProperties(), prop => prop.Name));
+            model.Add(typeof(LogEntry<TestOperation>), false).SetSurrogate(typeof(MutableLogEntry<TestOperation>));
+            model.Add(typeof(MutableLogEntryId), false).Add(Array.ConvertAll(typeof(LogEntryId).GetProperties(), prop => prop.Name));
+            model.Add(typeof(LogEntryId), false).SetSurrogate(typeof(MutableLogEntryId));
+            model.Add(typeof(TestOperation), false).Add(Array.ConvertAll(typeof(TestOperation).GetProperties(), prop => prop.Name));
+            return new ProtobufSerializer<LogEntry<TestOperation>>(model);
+        }
+
+
         [Fact]
         public void StreamLogStoresAndRetrievesLogEntries()
         {
-            var serializer = new ProtobufSerializer<LogEntry<TestOperation>>(typeof(TestOperation), typeof(LogEntryId));
+            var serializer = CreateSerializer();
+
             using (var memoryStream = new MemoryStream())
             {
                 var log = new StreamLog<TestOperation>(memoryStream, serializer);
@@ -65,7 +79,6 @@
         {
 
             log.Contains(new LogEntryId(1, 4)).Should().BeFalse();
-        
 
             Assert.Throws<ArgumentOutOfRangeException>(() => log.Get(2));
 
@@ -80,7 +93,7 @@
         [Fact]
         void StreamLogCanOpenAnExistingStream()
         {
-            var serializer = new ProtobufSerializer<LogEntry<TestOperation>>(typeof(TestOperation), typeof(LogEntryId));
+            var serializer = CreateSerializer();
             using (var memoryStream = new MemoryStream())
             {
                 var log1 = new StreamLog<TestOperation>(memoryStream, serializer);

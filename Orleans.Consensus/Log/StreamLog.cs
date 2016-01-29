@@ -35,7 +35,7 @@
             while (stream.Position < stream.Length)
             {
                 var position = stream.Position;
-                var entry = serializer.Deserialize(stream).Result;
+                var entry = serializer.Deserialize(stream);
                 this.bTreeIndex.Insert(entry.Id.Index, position);
                 AddToCache(entry);
                 this.LastLogEntryId = entry.Id;
@@ -84,7 +84,7 @@
             foreach (var entry in sortedEntries)
             {
                 var position = stream.Position;
-                await serializer.Serialize(entry, stream);
+                serializer.Serialize(entry, stream);
                 await stream.FlushAsync();
                 this.bTreeIndex.Insert(entry.Id.Index, position);
                 this.AddToCache(entry);
@@ -162,7 +162,7 @@
             if (null == indexEntry) throw new ArgumentOutOfRangeException("cannot find index");
 
             stream.Position = indexEntry.Pointer;
-            return serializer.Deserialize(stream).Result;
+            return serializer.Deserialize(stream);
         }
 
         public IEnumerable<LogEntry<TOperation>> GetCursor(long fromIndex)

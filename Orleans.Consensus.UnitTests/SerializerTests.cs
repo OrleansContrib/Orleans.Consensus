@@ -6,7 +6,10 @@
     using Xunit;
     using FluentAssertions;
     using System;
+    using ProtoBuf;
+    using ProtoBuf.Meta;
 
+    
     public class TestOperation
     {
         public string StringValue { get; set; }
@@ -20,7 +23,15 @@
         [Fact]
         public void ProtobufSerializerCanSerializeAndDeserialize()
         {
-            var serializer = new ProtobufSerializer<LogEntry<TestOperation>>(typeof(TestOperation), typeof(LogEntryId));
+            var model = TypeModel.Create();
+            model.Add(typeof(MutableLogEntry<TestOperation>), false).Add(Array.ConvertAll(typeof(MutableLogEntry<TestOperation>).GetProperties(), prop => prop.Name));
+            model.Add(typeof(LogEntry<TestOperation>), false).SetSurrogate(typeof(MutableLogEntry<TestOperation>));
+            model.Add(typeof(MutableLogEntryId), false).Add(Array.ConvertAll(typeof(LogEntryId).GetProperties(), prop => prop.Name));
+            model.Add(typeof(LogEntryId), false).SetSurrogate(typeof(MutableLogEntryId));
+            model.Add(typeof(TestOperation), false).Add(Array.ConvertAll(typeof(TestOperation).GetProperties(), prop => prop.Name));
+
+
+            var serializer = new ProtobufSerializer<LogEntry<TestOperation>>(model);
             TestSerializer(serializer);
         }
 
@@ -41,14 +52,14 @@
                 stream.Length.Should().Be(0);
 
                 // write the object to the stream
-                serializer.Serialize(testEntry, stream).Wait();
+                serializer.Serialize(testEntry, stream);
 
                 stream.Position.Should().NotBe(0);
                 stream.Length.Should().NotBe(0);
 
                 // read the object from the stream
                 stream.Position = 0;
-                var clone = serializer.Deserialize(stream).Result;
+                var clone = serializer.Deserialize(stream);
 
                 stream.Position.Should().NotBe(0);
                 clone.Should().NotBeNull();
@@ -67,9 +78,9 @@
                 // read the stream back, we expect to find 2 entries
                 // reading beyond the end of the stream will result in nulls
                 stream.Position = 0;
-                var clone1 = serializer.Deserialize(stream).Result;
-                var clone2 = serializer.Deserialize(stream).Result;
-                var clone3 = serializer.Deserialize(stream).Result;
+                var clone1 = serializer.Deserialize(stream);
+                var clone2 = serializer.Deserialize(stream);
+                var clone3 = serializer.Deserialize(stream);
                 clone1.Operation.Should().NotBeNull();
                 clone2.Operation.Should().NotBeNull();
                 clone3.Operation.Should().BeNull();

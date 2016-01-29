@@ -5,7 +5,7 @@
 
     public interface ISerializer<T>
     {
-        Task Serialize(T value, Stream stream);
-        Task<T> Deserialize(Stream stream);
+        void Serialize(T value, Stream stream);
+        T Deserialize(Stream stream);
     }
 }

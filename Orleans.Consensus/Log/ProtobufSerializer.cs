@@ -7,30 +7,35 @@
 
     public class ProtobufSerializer<T> : ISerializer<T> where T:new()
     {
-        RuntimeTypeModel model;
+        TypeModel model;
 
         public ProtobufSerializer(params Type[] subTypes)
         {
-            model = TypeModel.Create();
+            var runtimeModel = TypeModel.Create();
             foreach (var type in subTypes)
             {
-                model.Add(type, false).Add(Array.ConvertAll(type.GetProperties(), prop => prop.Name));
+                runtimeModel.Add(type, false).Add(Array.ConvertAll(type.GetProperties(), prop => prop.Name));
             }
-            model.Add(typeof(T), false).Add(Array.ConvertAll(typeof(T).GetProperties(), prop => prop.Name));
-            model.Compile();
+            runtimeModel.Add(typeof(T), false).Add(Array.ConvertAll(typeof(T).GetProperties(), prop => prop.Name));
+            runtimeModel.Compile();
+            this.model = runtimeModel;
         }
 
-        public Task<T> Deserialize(Stream stream)
+        public ProtobufSerializer(TypeModel typeModel)
+        {
+            this.model = typeModel;
+        }
+
+        public T Deserialize(Stream stream)
         {
             var value = default(T);
             var result = model.DeserializeWithLengthPrefix(stream, value, typeof(T), ProtoBuf.PrefixStyle.Fixed32, 0);
-            return Task.FromResult((T) result);
+            return (T) result;
         }
 
-        public Task Serialize(T value, Stream stream)
+        public void Serialize(T value, Stream stream)
         {
             model.SerializeWithLengthPrefix(stream, value, typeof(T), ProtoBuf.PrefixStyle.Fixed32, 0);
-            return Task.FromResult(0);
         }
     }
 }
