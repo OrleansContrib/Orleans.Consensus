@@ -83,6 +83,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BTreeTests.cs" />
     <Compile Include="PersistentLogTests.cs" />
     <Compile Include="SerializerTests.cs" />
     <Compile Include="Utilities\Disposable.cs" />

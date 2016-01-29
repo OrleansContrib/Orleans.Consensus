@@ -9,7 +9,7 @@
     {
         private int degree;
 
-        public Node(int degree)
+        public Node(int degree = 2)
         {
             this.degree = degree;
             this.Children = new List<Node<TK, TP>>(degree);
