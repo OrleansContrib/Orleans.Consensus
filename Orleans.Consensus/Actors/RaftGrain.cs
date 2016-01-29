@@ -76,7 +76,7 @@ namespace Orleans.Consensus.Actors
             applicationContainerBuilder.RegisterType<Settings>().As<ISettings>().SingleInstance().PreserveExistingDefaults();
             applicationContainerBuilder.RegisterType<StaticMembershipProvider>()
                 .OnActivated(_ => _.Instance.SetServers(allServers))
-                .SingleInstance()
+                .InstancePerLifetimeScope()
                 .AsImplementedInterfaces()
                 .PreserveExistingDefaults();
             applicationContainerBuilder.RegisterType<VolatileState>()
