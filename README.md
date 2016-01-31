@@ -7,11 +7,18 @@ Orleans.Consensus implements a replicated log using the [Raft](https://raft.gith
 
 > Note that that grandiose statement above is a lie and this is an incomplete proof-of-concept which you should not use for mission-critical workloads (or any workloads) :)
 
+## Goal
+* Fault-tolerant: services should be available during partial cluster failures and should recover promptly without user intervention.
+* Durable: acknowledged writes must not be lost, even in the event of a temporary total cluster failure.
+* Scalable: each replicated service should have minimal overhead, particularly when not actively replicating operations.
+* Responsive: replicated services should respond promptly to requests (of course, this depends on the environment).
+* Extensible: consumers should feel comfortable creating their own services using this library.
+
 ## Usage
 
 Open project in VS, hit F5, watch the debug output.
 
-## TODO
+## Status
 
 * ~~Extract interfaces for the concrete classes and clean them up.~~
 * ~~Autofac for dependency injection to make the system more testable.~~
