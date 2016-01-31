@@ -16,6 +16,9 @@ Open project in VS, hit F5, watch the debug output.
 * ~~Extract interfaces for the concrete classes and clean them up.~~
 * ~~Autofac for dependency injection to make the system more testable.~~
 * Extensive automated testing.
+  * ~~Follower~~/~~Candidate~~/Leader role behavior
+  * ~~RoleCoordinator~~
+  * System tests with fault injection.
 * Use Orleans to provide cluster membership.
 * Implement Joint-Consensus for cluster membership change from the Raft paper.
 * Implement a physical log (it's all in-memory at the moment) - and make sure it's cross-platform! Probably have one physical log per cluster based on Sqlite or another xplat embeddable db (suggestions?).
