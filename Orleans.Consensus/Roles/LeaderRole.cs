@@ -43,7 +43,7 @@ namespace Orleans.Consensus.Roles
 
         private readonly IRaftPersistentState persistentState;
 
-        private readonly Dictionary<string, FollowerProgress> servers = new Dictionary<string, FollowerProgress>();
+        private readonly Dictionary<string, FollowerProgress> followers = new Dictionary<string, FollowerProgress>();
 
         private readonly IStateMachine<TOperation> stateMachine;
 
@@ -84,7 +84,7 @@ namespace Orleans.Consensus.Roles
             this.heartbeatTimeout = TimeSpan.FromMilliseconds(this.settings.HeartbeatTimeoutMilliseconds);
         }
 
-        private int QuorumSize => (this.servers.Count + 1) / 2;
+        private int QuorumSize => (this.followers.Count + 1) / 2;
 
         public string RoleName => "Leader";
 
@@ -93,9 +93,9 @@ namespace Orleans.Consensus.Roles
             this.logger.LogInfo("Becoming leader.");
 
             // Initialize volatile state on leader.
-            foreach (var server in this.membershipProvider.AllServers.Where(_ => !string.Equals(_, this.identity.Id)))
+            foreach (var server in this.membershipProvider.OtherServers)
             {
-                this.servers[server] = new FollowerProgress
+                this.followers[server] = new FollowerProgress
                 {
                     NextIndex = this.journal.LastLogEntryId.Index + 1,
                     MatchIndex = 0
@@ -156,7 +156,7 @@ namespace Orleans.Consensus.Roles
             ICollection<LogEntry<TOperation>> entries;
             if (operations?.Count > 0)
             {
-                this.logger.LogInfo($"Replicating {operations.Count} entries to {this.servers.Count} servers");
+                this.logger.LogInfo($"Replicating {operations.Count} entries to {this.followers.Count} servers");
             }
 
             if (operations != null && operations.Count > 0)
@@ -177,14 +177,9 @@ namespace Orleans.Consensus.Roles
                 entries = null;
             }
 
-            var tasks = new List<Task>(this.servers.Count);
-            foreach (var server in this.servers)
+            var tasks = new List<Task>(this.followers.Count);
+            foreach (var server in this.followers)
             {
-                if (string.Equals(this.identity.Id, server.Key, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
                 tasks.Add(this.AppendEntriesOnServer(server.Key, server.Value));
             }
 
@@ -207,18 +202,8 @@ namespace Orleans.Consensus.Roles
                 return Task.FromResult(0);
             }
 
-            foreach (var server in this.servers.Keys)
-            {
-                if (string.Equals(this.identity.Id, server, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                // Send a heartbeat to the server.
-                this.ReplicateOperations(null).Ignore();
-            }
-
-            return Task.FromResult(0);
+            // Send a heartbeat.
+            return this.ReplicateOperations(null);
         }
 
         private async Task AppendEntriesOnServer(string serverId, FollowerProgress followerProgress)
@@ -329,7 +314,7 @@ namespace Orleans.Consensus.Roles
 
                 var index = entry.Id.Index;
                 var replicas = 0;
-                foreach (var server in this.servers)
+                foreach (var server in this.followers)
                 {
                     // If the server is not known to have this log entry, continue to the next server.
                     if (server.Value.MatchIndex < index)
@@ -347,7 +332,7 @@ namespace Orleans.Consensus.Roles
 
                     // This entry is committed.
                     this.logger.LogInfo(
-                        $"Recently committed entries from {this.volatileState.CommitIndex} to {index} with {replicas + 1}/{this.servers.Count + 1} replicas.");
+                        $"Recently committed entries from {this.volatileState.CommitIndex} to {index} with {replicas + 1}/{this.followers.Count + 1} replicas.");
                     this.volatileState.CommitIndex = index;
                     return this.ApplyRemainingCommittedEntries();
                 }
