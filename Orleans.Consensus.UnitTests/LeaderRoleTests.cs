@@ -9,6 +9,7 @@
     using AutofacContrib.NSubstitute;
 
     using FluentAssertions;
+    using FluentAssertions.Common;
 
     using NSubstitute;
 
@@ -24,25 +25,15 @@
     using Xunit;
     using Xunit.Abstractions;
 
-    public class CandidateRoleTests
+    public class LeaderRoleTests
     {
-        private const int MinElectionTime = 72;
-
-        private const int MaxElectionTime = 720;
-
-        private const int RiggedRandomResult = 440;
-
         private readonly IRoleCoordinator<int> coordinator;
 
         private readonly InMemoryLog<int> journal;
 
         private readonly InMemoryPersistentState persistentState;
-
-        private readonly IRandom random;
-
-        private readonly CandidateRole<int> role;
-
-        private readonly ISettings settings;
+        
+        private readonly LeaderRole<int> role;
 
         private readonly MockTimers timers;
 
@@ -54,9 +45,7 @@
 
         private readonly FakeGrainFactory grainFactory;
 
-        private readonly AutoSubstitute container;
-
-        public CandidateRoleTests(ITestOutputHelper output)
+        public LeaderRoleTests(ITestOutputHelper output)
         {
             var builder =
                 new AutoSubstitute(cb => cb.Register(_ => Substitute.For<IRaftGrain<int>>()).InstancePerDependency());
@@ -64,16 +53,7 @@
 
             this.volatileState = new VolatileState();
             builder.Provide<IRaftVolatileState>(this.volatileState);
-
-            // Configure settings
-            this.settings = builder.Resolve<ISettings>();
-            this.settings.MinElectionTimeoutMilliseconds.Returns(MinElectionTime);
-            this.settings.MaxElectionTimeoutMilliseconds.Returns(MaxElectionTime);
-
-            // Rig random number generator to always return the same value.
-            this.random = builder.Resolve<IRandom>();
-            this.random.Next(Arg.Any<int>(), Arg.Any<int>()).Returns(RiggedRandomResult);
-
+            
             this.coordinator = builder.Resolve<IRoleCoordinator<int>>();
             this.coordinator.StepDownIfGreaterTerm(Arg.Any<IMessage>(), Arg.Any<IRaftPersistentState>())
                 .Returns(
@@ -110,8 +90,7 @@
                     .Returns(Task.FromResult(new RequestVoteResponse { VoteGranted = true }));
 
             // After the container is configured, resolve required services.
-            this.role = builder.Resolve<CandidateRole<int>>();
-            this.container = builder;
+            this.role = builder.Resolve<LeaderRole<int>>();
         }
 
         private Action<string, IRaftGrain<int>> OnRaftGrainCreated
@@ -134,74 +113,54 @@
         }
 
         /// <summary>
-        /// Candidates should start an election timer when initializing.
+        /// Leaders should start an election timer when initializing.
         /// </summary>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         [Fact]
-        public async Task EntryStartsElectionTimer()
-        {
-            await this.role.Enter();
-
-            // A timer should have been registered.
-            this.timers.Registrations.Should().HaveCount(1);
-
-            // Check that the correct timer was registered.
-            var timer = this.timers[0];
-            this.random.Received()
-                .Next(this.settings.MinElectionTimeoutMilliseconds, this.settings.MaxElectionTimeoutMilliseconds);
-            timer.DueTime.Should().Be(TimeSpan.FromMilliseconds(RiggedRandomResult));
-            timer.Period.Should().Be(TimeSpan.FromMilliseconds(RiggedRandomResult));
-            timer.Disposable.Disposed.Should().BeFalse();
-
-            // Check that the timer causes the instance to become a candidate.
-            await this.coordinator.DidNotReceive().BecomeCandidate();
-            await this.timers[0].Callback(null);
-            await this.coordinator.Received().BecomeCandidate();
-        }
-
-        /// <summary>
-        /// Candidates should request votes from other servers when initializing.
-        /// </summary>
-        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
-        [Fact]
-        public async Task RequestsVotesOnEntry()
+        public async Task EntrySendsHeartbeat()
         {
             // Setup: configure grains to always grant votes
             this.OnRaftGrainCreated = (id, grain) =>
             {
-                var raftGrain = grain;
-                raftGrain?.RequestVote(Arg.Any<RequestVoteRequest>())
-                    .Returns(Task.FromResult(new RequestVoteResponse { Term = 1, VoteGranted = true }));
+                grain.Append(Arg.Any<AppendRequest<int>>())
+                    .Returns(Task.FromResult(new AppendResponse { Term = 1, Success = true }));
             };
+
+            this.persistentState.CurrentTerm.Returns(4);
+            this.journal.Entries.Add(new LogEntry<int>(new LogEntryId(3, 1), 4));
 
             await this.role.Enter();
 
-            foreach (var server in this.members.AllServers)
+            // A timer should have been registered for the heartbeat;
+            this.timers.Registrations.Should().HaveCount(1);
+            
+            // Fire the timer.
+            await this.timers[0].Callback(this.timers[0].State);
+
+            var expectedRequest = new AppendRequest<int>
+            {
+                Leader = this.identity.Id,
+                Term = this.persistentState.CurrentTerm,
+                LeaderCommitIndex = this.volatileState.CommitIndex,
+                PreviousLogEntry = new LogEntryId(3, 1)
+            };
+
+            // Check that all of the followers received a heartbeat request.
+            foreach (var server in this.members.OtherServers)
             {
                 var grain = this.grainFactory.GetGrain<IRaftGrain<int>>(server);
-                if (string.Equals(server, this.identity.Id, StringComparison.Ordinal))
-                {
-                    await grain.DidNotReceive().RequestVote(Arg.Any<RequestVoteRequest>());
-                    continue;
-                }
-
-                var request = new RequestVoteRequest(
-                    this.persistentState.CurrentTerm,
-                    this.identity.Id,
-                    this.journal.LastLogEntryId);
-
-                await grain.Received().RequestVote(request);
+                grain.ReceivedCalls().Should().ContainSingle().Which.IsSameOrEqualTo(expectedRequest);
             }
         }
 
         /// <summary>
-        /// Candidates must dispose the election timer when transitioning out of the candidate role.
+        /// Leaders must dispose the election timer when transitioning out of the leader role.
         /// </summary>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         [Fact]
         public async Task ExitDisposesTimer()
         {
-            await this.EntryStartsElectionTimer();
+            await this.EntrySendsHeartbeat();
             await this.role.Exit();
 
             foreach (var timer in this.timers)
@@ -211,29 +170,7 @@
         }
 
         /// <summary>
-        /// Candidates transition into the leader role when they receive a quorum of votes.
-        /// </summary>
-        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
-        [Fact]
-        public async Task BecomeLeaderUponQuorum()
-        {
-            this.OnRaftGrainCreated = (id, grain) =>
-            {
-                // Two of the 4 other servers return true, making a quorum given that candidates
-                // always vote for themselves.
-                var grantVote = id == "other1" || id == "other2";
-                grain.RequestVote(Arg.Any<RequestVoteRequest>())
-                    .Returns(Task.FromResult(new RequestVoteResponse { Term = 1, VoteGranted = grantVote }));
-            };
-
-            await this.role.Enter();
-
-            // Check that the candidate transitioned into a leader.
-            await this.coordinator.Received().BecomeLeader();
-        }
-
-        /// <summary>
-        /// Candidates transition into the follower role if they discover a higher term number in a RequestVote
+        /// Leaders transition into the follower role if they discover a higher term number in an append
         /// response.
         /// </summary>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
@@ -243,37 +180,20 @@
             this.OnRaftGrainCreated = (id, grain) =>
             {
                 // All other servers are in a higher term.
-                grain.RequestVote(Arg.Any<RequestVoteRequest>())
-                    .Returns(Task.FromResult(new RequestVoteResponse { Term = 2, VoteGranted = false }));
+                grain.Append(Arg.Any<AppendRequest<int>>())
+                    .Returns(Task.FromResult(new AppendResponse { Term = 2, Success = false }));
             };
 
             await this.role.Enter();
+            await this.role.ReplicateOperations(new[] { 293 });
 
-            // Check that the candidate would have stepped down.
+            // Check that the leader would have stepped down.
             await
                 this.coordinator.Received().StepDownIfGreaterTerm(Arg.Any<IMessage>(), Arg.Any<IRaftPersistentState>());
         }
 
         /// <summary>
-        /// Candidates transition into candidates for the next term when not messaged between election timer firings.
-        /// </summary>
-        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
-        [Fact]
-        public async Task RestartCandidacyWhenNoLeaderDeclared()
-        {
-            this.OnRaftGrainCreated = (id, grain) =>
-            { grain.RequestVote(Arg.Any<RequestVoteRequest>()).Returns(new RequestVoteResponse { Term = 1 }); };
-
-            // Become a candidate.
-            await this.role.Enter();
-
-            // Fire the election timer.
-            await this.timers[0].Callback(null);
-            await this.coordinator.Received().BecomeCandidate();
-        }
-
-        /// <summary>
-        /// Candidates learn of new terms when receiving append calls.
+        /// Leaders learn of new terms when receiving append calls.
         /// </summary>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         [Fact]
@@ -286,28 +206,11 @@
             this.coordinator.ClearReceivedCalls();
             var request = new AppendRequest<int> { Term = 2 };
             await this.role.Append(request);
-            await this.coordinator.Received().BecomeFollowerForTerm(2);
-        }
-
-        /// <summary>
-        /// Candidates learn of new leaders when receiving append calls.
-        /// </summary>
-        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
-        [Fact]
-        public async Task LearnsOfNewLeaderThroughAppend()
-        {
-            await this.role.Enter();
-            this.persistentState.CurrentTerm.Returns(_ => 1);
-            this.persistentState.VotedFor.Returns(_ => this.identity.Id);
-
-            this.coordinator.ClearReceivedCalls();
-            var request = new AppendRequest<int> { Term = 1 };
-            await this.role.Append(request);
-            await this.coordinator.Received().BecomeFollowerForTerm(1);
+            await this.coordinator.Received().StepDownIfGreaterTerm(request, this.persistentState);
         }
         
         /// <summary>
-        /// Candidates do not append entries from deposed leaders.
+        /// Leaders do not append entries from deposed leaders.
         /// </summary>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         [Fact]
@@ -337,28 +240,32 @@
         }
 
         /// <summary>
-        /// Candidates cannot replicate operations.
+        /// Leaders can replicate operations.
         /// </summary>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         [Fact]
-        public async Task CannotReplicateOperations()
+        public async Task CanReplicateOperations()
         {
+            this.OnRaftGrainCreated = (id, grain) =>
+            { grain.Append(Arg.Any<AppendRequest<int>>()).Returns(new AppendResponse { Success = true }); };
             await this.role.Enter();
-            var exception = await Assert.ThrowsAsync<NotLeaderException>(async () => await this.role.ReplicateOperations(new[] { 1 }));
-            Assert.True(string.IsNullOrEmpty(exception.Leader));
+            var replicatedOperations = await this.role.ReplicateOperations(new[] { 89 });
+            replicatedOperations.Should()
+                .ContainSingle()
+                .Which.IsSameOrEqualTo(new LogEntry<int>(new LogEntryId(0, 1), 89));
         }
         
         /// <summary>
-        /// The role name is "Candidate".
+        /// The role name is "Leader".
         /// </summary>
         [Fact]
-        public void RoleNameIsCandidate()
+        public void RoleNameIsLeader()
         {
-            this.role.RoleName.Should().Be("Candidate");
+            this.role.RoleName.Should().Be("Leader");
         }
 
         /// <summary>
-        /// Candidates reject votes from candidates in previous terms.
+        /// Leaders reject votes from leaders in previous terms.
         /// </summary>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         [Fact]
@@ -376,7 +283,7 @@
         }
 
         /// <summary>
-        /// Candidates should learn of new terms in request vote calls.
+        /// Leaders should learn of new terms in request vote calls.
         /// </summary>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         [Fact]

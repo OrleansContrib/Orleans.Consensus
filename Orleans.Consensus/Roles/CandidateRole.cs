@@ -155,39 +155,33 @@
                 var responseTask = task as Task<RequestVoteResponse>;
                 if (responseTask == null)
                 {
+                    // The cancellation token was cancelled, exit.
                     return;
                 }
 
                 var response = await responseTask;
 
-                try
+                if (await this.local.StepDownIfGreaterTerm(response, this.persistentState))
                 {
-                    if (await this.local.StepDownIfGreaterTerm(response, this.persistentState))
-                    {
-                        return;
-                    }
-
-                    if (!response.VoteGranted)
-                    {
-                        continue;
-                    }
-
-                    this.votes++;
-                    this.logger.LogInfo(
-                        $"Received {this.votes} votes as candidate for term {this.persistentState.CurrentTerm}.");
-
-                    // If votes received from majority of servers: become leader (§5.2)
-                    if (this.votes >= this.QuorumSize)
-                    {
-                        this.logger.LogInfo(
-                            $"Becoming leader for term {this.persistentState.CurrentTerm} with {this.votes}/{this.membershipProvider.OtherServers.Count + 1} votes.");
-                        await this.local.BecomeLeader();
-                        return;
-                    }
+                    return;
                 }
-                catch (Exception exception)
+
+                if (!response.VoteGranted)
                 {
-                    this.logger.LogWarn($"Exception from {nameof(this.RequestVote)}: {exception}");
+                    continue;
+                }
+
+                this.votes++;
+                this.logger.LogInfo(
+                    $"Received {this.votes} votes as candidate for term {this.persistentState.CurrentTerm}.");
+
+                // If votes received from majority of servers: become leader (§5.2)
+                if (this.votes >= this.QuorumSize)
+                {
+                    this.logger.LogInfo(
+                        $"Becoming leader for term {this.persistentState.CurrentTerm} with {this.votes}/{this.membershipProvider.OtherServers.Count + 1} votes.");
+                    await this.local.BecomeLeader();
+                    return;
                 }
             }
         }
