@@ -1,11 +1,10 @@
 # Orleans.Consensus
 [![Build status](https://ci.appveyor.com/api/projects/status/6hjgxgc6rjnkd5hg?svg=true)](https://ci.appveyor.com/project/ReubenBond/orleans-consensus)
 
-
 A library for creating fault-tolerant, strong-consistency, persistent services with [Orleans](https://github.com/dotnet/orleans).
 Orleans.Consensus implements a replicated log using the [Raft](https://raft.github.io/) consensus algorithm, allowing consumers to turn single-node services into distributed services.
 
-> Note that that grandiose statement above is a lie and this is an incomplete proof-of-concept which you should not use for mission-critical workloads (or any workloads) :)
+> Note that that this is currently a pre-alpha work-in-progress which you should not use for anything, but you should help us build it :)
 
 ## Goal
 * Fault-tolerant: services should be available during partial cluster failures and should recover promptly without user intervention.
