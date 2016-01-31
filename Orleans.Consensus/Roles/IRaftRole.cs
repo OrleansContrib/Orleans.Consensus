@@ -13,7 +13,7 @@ namespace Orleans.Consensus.Roles
     public interface IRaftRole<TOperation>
     {
         /// <summary>
-        /// The name of this role.
+        /// Gets the name of this role.
         /// </summary>
         string RoleName { get; }
 

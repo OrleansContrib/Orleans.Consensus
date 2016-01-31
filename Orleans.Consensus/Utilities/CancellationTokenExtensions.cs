@@ -5,9 +5,9 @@
 
     internal static class CancellationTokenExtensions
     {
-        public static Task WhenCanceled(this CancellationToken token)
+        public static Task<T> WhenCanceled<T>(this CancellationToken token)
         {
-            var completion = new TaskCompletionSource<int>();
+            var completion = new TaskCompletionSource<T>();
             token.Register(completion.SetCanceled);
             return completion.Task;
         }

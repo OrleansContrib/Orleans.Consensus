@@ -86,6 +86,8 @@
             this.RequestVotes().Ignore();
         }
 
+        private int QuorumSize => this.membershipProvider.OtherServers.Count / 2;
+
         public Task Exit()
         {
             this.logger.LogInfo("Leaving candidate state.");
@@ -133,9 +135,9 @@
                 this.persistentState.CurrentTerm,
                 this.identity.Id,
                 this.journal.LastLogEntryId);
-            var tasks = new List<Task>(this.membershipProvider.OtherServers.Count + 1)
+            var tasks = new List<Task<RequestVoteResponse>>(this.membershipProvider.OtherServers.Count + 1)
             {
-                this.cancellation.Token.WhenCanceled()
+                this.cancellation.Token.WhenCanceled<RequestVoteResponse>()
             };
 
             // Send vote requests to each server.
@@ -152,15 +154,7 @@
                 var task = await Task.WhenAny(tasks);
                 tasks.Remove(task);
 
-                var responseTask = task as Task<RequestVoteResponse>;
-                if (responseTask == null)
-                {
-                    // The cancellation token was cancelled, exit.
-                    return;
-                }
-
-                var response = await responseTask;
-
+                var response = await task;
                 if (await this.local.StepDownIfGreaterTerm(response))
                 {
                     return;
@@ -183,14 +177,6 @@
                     await this.local.BecomeLeader();
                     return;
                 }
-            }
-        }
-
-        private int QuorumSize
-        {
-            get
-            {
-                return this.membershipProvider.OtherServers.Count / 2;
             }
         }
 
