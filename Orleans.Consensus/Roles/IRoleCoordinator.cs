@@ -3,7 +3,6 @@ namespace Orleans.Consensus.Roles
     using System.Threading.Tasks;
 
     using Orleans.Consensus.Contract.Messages;
-    using Orleans.Consensus.State;
 
     public interface IRoleCoordinator<TOperation>
     {
@@ -15,7 +14,7 @@ namespace Orleans.Consensus.Roles
 
         Task BecomeLeader();
 
-        Task<bool> StepDownIfGreaterTerm(IMessage message, IRaftPersistentState state);
+        Task<bool> StepDownIfGreaterTerm(IMessage message);
 
         Task Initialize();
 

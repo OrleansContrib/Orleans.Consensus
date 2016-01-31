@@ -55,9 +55,9 @@
             builder.Provide<IRaftVolatileState>(this.volatileState);
             
             this.coordinator = builder.Resolve<IRoleCoordinator<int>>();
-            this.coordinator.StepDownIfGreaterTerm(Arg.Any<IMessage>(), Arg.Any<IRaftPersistentState>())
+            this.coordinator.StepDownIfGreaterTerm(Arg.Any<IMessage>())
                 .Returns(
-                    info => Task.FromResult(((IMessage)info[0]).Term > ((IRaftPersistentState)info[1]).CurrentTerm));
+                    info => Task.FromResult(((IMessage)info[0]).Term > this.persistentState.CurrentTerm));
             var currentRole = builder.Resolve<IRaftRole<int>>();
             currentRole.RequestVote(Arg.Any<RequestVoteRequest>())
                 .Returns(Task.FromResult(new RequestVoteResponse { Term = 1, VoteGranted = true }));
@@ -189,7 +189,7 @@
 
             // Check that the leader would have stepped down.
             await
-                this.coordinator.Received().StepDownIfGreaterTerm(Arg.Any<IMessage>(), Arg.Any<IRaftPersistentState>());
+                this.coordinator.Received().StepDownIfGreaterTerm(Arg.Any<IMessage>());
         }
 
         /// <summary>
@@ -206,7 +206,7 @@
             this.coordinator.ClearReceivedCalls();
             var request = new AppendRequest<int> { Term = 2 };
             await this.role.Append(request);
-            await this.coordinator.Received().StepDownIfGreaterTerm(request, this.persistentState);
+            await this.coordinator.Received().StepDownIfGreaterTerm(request);
         }
         
         /// <summary>
@@ -295,7 +295,7 @@
 
             var request = new RequestVoteRequest(2, "Napoleon", default(LogEntryId));
             await this.role.RequestVote(request);
-            await this.coordinator.Received().StepDownIfGreaterTerm(request, this.persistentState);
+            await this.coordinator.Received().StepDownIfGreaterTerm(request);
         }
     }
 }

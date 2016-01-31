@@ -90,6 +90,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="RoleCoordinatorTests.cs" />
     <Compile Include="LeaderRoleTests.cs" />
     <Compile Include="CandidateRoleTests.cs" />
     <Compile Include="BTreeTests.cs" />

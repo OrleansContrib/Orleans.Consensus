@@ -131,7 +131,7 @@ namespace Orleans.Consensus.Roles
         public async Task<RequestVoteResponse> RequestVote(RequestVoteRequest request)
         {
             // If RPC request or response contains term T > currentTerm: set currentTerm = T, convert to follower (§5.1)
-            if (await this.coordinator.StepDownIfGreaterTerm(request, this.persistentState))
+            if (await this.coordinator.StepDownIfGreaterTerm(request))
             {
                 return await this.coordinator.Role.RequestVote(request);
             }
@@ -142,7 +142,7 @@ namespace Orleans.Consensus.Roles
         public async Task<AppendResponse> Append(AppendRequest<TOperation> request)
         {
             // If RPC request or response contains term T > currentTerm: set currentTerm = T, convert to follower (§5.1)
-            if (await this.coordinator.StepDownIfGreaterTerm(request, this.persistentState))
+            if (await this.coordinator.StepDownIfGreaterTerm(request))
             {
                 return await this.coordinator.Role.Append(request);
             }
@@ -263,7 +263,7 @@ namespace Orleans.Consensus.Roles
                 }
 
                 this.logger.LogWarn($"Received failure response for append call with term of {response.Term}");
-                if (await this.coordinator.StepDownIfGreaterTerm(response, this.persistentState))
+                if (await this.coordinator.StepDownIfGreaterTerm(response))
                 {
                     // This node is no longer a leader, so retire.
                     return;
