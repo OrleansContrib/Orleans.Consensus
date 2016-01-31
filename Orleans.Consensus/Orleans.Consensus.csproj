@@ -120,6 +120,9 @@
     <Compile Include="Log\ISerializer.cs" />
     <Compile Include="Log\ProtobufSerializer.cs" />
     <Compile Include="Log\StreamLog.cs" />
+    <Compile Include="Roles\ICandidateRole.cs" />
+    <Compile Include="Roles\IFollowerRole.cs" />
+    <Compile Include="Roles\ILeaderRole.cs" />
     <Compile Include="Utilities\PersistentLogExtensions.cs" />
     <Compile Include="State\IRaftPersistentState.cs" />
     <Compile Include="State\IRaftVolatileState.cs" />

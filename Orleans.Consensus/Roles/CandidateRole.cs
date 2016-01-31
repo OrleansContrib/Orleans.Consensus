@@ -12,7 +12,7 @@
     using Orleans.Consensus.State;
     using Orleans.Consensus.Utilities;
 
-    internal class CandidateRole<TOperation> : IRaftRole<TOperation>
+    internal class CandidateRole<TOperation> : ICandidateRole<TOperation>
     {
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
 

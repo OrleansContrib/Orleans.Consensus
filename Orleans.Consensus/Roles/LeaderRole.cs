@@ -19,7 +19,7 @@ namespace Orleans.Consensus.Roles
     using Orleans.Consensus.State;
     using Orleans.Consensus.Utilities;
 
-    internal class LeaderRole<TOperation> : IRaftRole<TOperation>
+    internal class LeaderRole<TOperation> : ILeaderRole<TOperation>
     {
         private readonly Stopwatch callTimer = new Stopwatch();
 

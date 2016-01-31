@@ -9,11 +9,10 @@
     using Orleans.Consensus.Contract;
     using Orleans.Consensus.Contract.Log;
     using Orleans.Consensus.Contract.Messages;
-    using Orleans.Consensus.Log;
     using Orleans.Consensus.State;
     using Orleans.Consensus.Utilities;
 
-    internal class FollowerRole<TOperation> : IRaftRole<TOperation>
+    internal class FollowerRole<TOperation> : IFollowerRole<TOperation>
     {
         private readonly IPersistentLog<TOperation> journal;
 
