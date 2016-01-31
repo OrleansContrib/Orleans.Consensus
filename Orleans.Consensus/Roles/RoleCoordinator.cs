@@ -1,12 +1,10 @@
 namespace Orleans.Consensus.Roles
 {
     using System;
-    using System.Linq;
     using System.Threading.Tasks;
 
     using Autofac;
 
-    using Orleans.Consensus.Actors;
     using Orleans.Consensus.Contract;
     using Orleans.Consensus.Contract.Messages;
     using Orleans.Consensus.State;
@@ -15,26 +13,15 @@ namespace Orleans.Consensus.Roles
     {
         private readonly ILifetimeScope container;
 
-        private readonly IServerIdentity identity;
-
         private readonly ILogger logger;
-
-        private readonly IMembershipProvider membershipProvider;
 
         private readonly IRaftPersistentState persistentState;
 
-        public RoleCoordinator(
-            ILifetimeScope container,
-            IRaftPersistentState persistentState,
-            ILogger logger,
-            IServerIdentity identity,
-            IMembershipProvider membershipProvider)
+        public RoleCoordinator(ILifetimeScope container, IRaftPersistentState persistentState, ILogger logger)
         {
             this.container = container;
             this.persistentState = persistentState;
             this.logger = logger;
-            this.identity = identity;
-            this.membershipProvider = membershipProvider;
         }
 
         public IRaftRole<TOperation> Role { get; private set; }
@@ -56,21 +43,10 @@ namespace Orleans.Consensus.Roles
             return false;
         }
 
-        public async Task Initialize()
+        public Task Initialize()
         {
-            if (this.persistentState.CurrentTerm == 0 && this.identity.Id == this.membershipProvider.AllServers.Min())
-            {
-                // As an attempted optimization, immediately become a candidate for the first term if this server has
-                // just been initialized.
-                // The candidacy will fail quickly if this server is being added to an existing cluster and the server
-                // will revert to follower in the updated term.
-                await this.BecomeCandidate();
-            }
-            else
-            {
-                // When servers start up, they begin as followers. (§5.2)
-                await this.BecomeFollowerForTerm(this.persistentState.CurrentTerm);
-            }
+            // When servers start up, they begin as followers. (§5.2)
+            return this.BecomeFollowerForTerm(this.persistentState.CurrentTerm);
         }
 
         public Task Shutdown() => this.TransitionRole(null);
