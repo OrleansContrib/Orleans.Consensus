@@ -98,7 +98,7 @@
         {
             // If the term of the requester is greater than the term of this instance, step down and handle the
             // message as a follower.
-            if (await this.local.StepDownIfGreaterTerm(request, this.persistentState))
+            if (await this.local.StepDownIfGreaterTerm(request))
             {
                 return await this.local.Role.RequestVote(request);
             }
@@ -161,7 +161,7 @@
 
                 var response = await responseTask;
 
-                if (await this.local.StepDownIfGreaterTerm(response, this.persistentState))
+                if (await this.local.StepDownIfGreaterTerm(response))
                 {
                     return;
                 }
