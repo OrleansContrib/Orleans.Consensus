@@ -38,6 +38,20 @@
             }
         }
 
+        [Fact]
+        public void SqliteLogStoresAndRetrievesLogEntries()
+        {
+            var serializer = new ProtobufSerializer<TestOperation>();
+            if (File.Exists("test.db")) File.Delete("test.db");
+        
+            var log = new SqliteLog<TestOperation>("test.db", serializer);
+            TestEmptyLog(log);
+            TestLog(log);
+            TestLog(log); // test again, as it will overwrite the existing entries
+
+          
+        }
+
         void TestLog(IPersistentLog<TestOperation> log)
         {
             var operations = new LogEntry<TestOperation>[]
