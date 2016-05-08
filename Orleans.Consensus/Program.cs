@@ -72,7 +72,6 @@
             config.Defaults.StatisticsLogWriteInterval = TimeSpan.FromDays(6);
             config.Defaults.TurnWarningLengthThreshold = TimeSpan.FromSeconds(15);
             config.Defaults.TraceToConsole = true;
-            config.Defaults.WriteMessagingTraces = false;
             config.Defaults.DefaultTraceLevel = Severity.Info;
             /*config.Defaults.TraceLevelOverrides.Add(Tuple.Create("Orleans", Severity.Warning));
             config.Defaults.TraceLevelOverrides.Add(Tuple.Create("Runtime", Severity.Warning));

@@ -92,9 +92,9 @@ namespace Orleans.Consensus.Actors
                 .PreserveExistingDefaults();
 
             // Register roles.
-            applicationContainerBuilder.RegisterType<FollowerRole<TOperation>>().PreserveExistingDefaults();
-            applicationContainerBuilder.RegisterType<CandidateRole<TOperation>>().PreserveExistingDefaults();
-            applicationContainerBuilder.RegisterType<LeaderRole<TOperation>>().PreserveExistingDefaults();
+            applicationContainerBuilder.RegisterType<FollowerRole<TOperation>>().AsImplementedInterfaces().PreserveExistingDefaults();
+            applicationContainerBuilder.RegisterType<CandidateRole<TOperation>>().AsImplementedInterfaces().PreserveExistingDefaults();
+            applicationContainerBuilder.RegisterType<LeaderRole<TOperation>>().AsImplementedInterfaces().PreserveExistingDefaults();
 
             var applicationContainer = applicationContainerBuilder.Build();
 
