@@ -2,8 +2,6 @@ namespace Orleans.Consensus.Utilities
 {
     using System;
     using System.Security.Cryptography;
-
-    using Orleans.Consensus.Actors;
     using Orleans.Consensus.Contract;
 
     public class ConcurrentRandom : IRandom

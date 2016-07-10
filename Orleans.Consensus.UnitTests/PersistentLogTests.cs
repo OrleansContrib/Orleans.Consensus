@@ -10,8 +10,7 @@
     using ProtoBuf.Meta;
     public class PersistentLogTests
     {
-
-        static ProtobufSerializer<LogEntry<TestOperation>> CreateSerializer()
+        private static ProtobufSerializer<LogEntry<TestOperation>> CreateSerializer()
         {
             var model = TypeModel.Create();
             model.Add(typeof(MutableLogEntry<TestOperation>), false).Add(Array.ConvertAll(typeof(MutableLogEntry<TestOperation>).GetProperties(), prop => prop.Name));
@@ -52,7 +51,7 @@
           
         }
 
-        void TestLog(IPersistentLog<TestOperation> log)
+        private void TestLog(IPersistentLog<TestOperation> log)
         {
             var operations = new LogEntry<TestOperation>[]
             {
@@ -89,7 +88,7 @@
 
         }
 
-        void TestEmptyLog(IPersistentLog<TestOperation> log)
+        private void TestEmptyLog(IPersistentLog<TestOperation> log)
         {
 
             log.Contains(new LogEntryId(1, 4)).Should().BeFalse();
@@ -105,7 +104,7 @@
         }
 
         [Fact]
-        void StreamLogCanOpenAnExistingStream()
+        private void StreamLogCanOpenAnExistingStream()
         {
             var serializer = CreateSerializer();
             using (var memoryStream = new MemoryStream())

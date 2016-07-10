@@ -7,13 +7,7 @@
 
     public class RaftBootstrap : IBootstrapProvider
     {
-        public string Name
-        {
-            get
-            {
-                return "Raft Bootstrap Provider";
-            }
-        }
+        public string Name => "Raft Bootstrap Provider";
 
         public Task Close()
         {

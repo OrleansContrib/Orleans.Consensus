@@ -9,7 +9,6 @@ namespace Orleans.Consensus.Actors
     using Orleans.Consensus.Contract;
     using Orleans.Consensus.Contract.Log;
     using Orleans.Consensus.Contract.Messages;
-    using Orleans.Consensus.Log;
     using Orleans.Consensus.Roles;
     using Orleans.Consensus.State;
     using Orleans.Consensus.Utilities;
@@ -43,7 +42,6 @@ namespace Orleans.Consensus.Actors
 
         public Task<AppendResponse> Append(AppendRequest<TOperation> request) => this.coordinator.Role.Append(request);
         
-        // TODO provide a state machine.
         protected abstract IStateMachine<TOperation> GetStateMachine(IComponentContext context);
 
         protected Task AppendEntry(TOperation entry)

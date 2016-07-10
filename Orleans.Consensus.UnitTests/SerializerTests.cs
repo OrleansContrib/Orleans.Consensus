@@ -6,7 +6,6 @@
     using Xunit;
     using FluentAssertions;
     using System;
-    using ProtoBuf;
     using ProtoBuf.Meta;
 
     
@@ -36,7 +35,7 @@
         }
 
         // generic test for any serializer implementation
-        void TestSerializer(ISerializer<LogEntry<TestOperation>> serializer)
+        private void TestSerializer(ISerializer<LogEntry<TestOperation>> serializer)
         {
             var testMessage = new TestOperation
             {

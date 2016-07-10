@@ -9,12 +9,12 @@
 
     public class StreamLog<TOperation> : IPersistentLog<TOperation>, IDisposable
     {
-        const int CACHE_SIZE = 1000;
+        private const int CACHE_SIZE = 1000;
 
-        Stream stream;
-        ISerializer<LogEntry<TOperation>> serializer;
-        BTree<long, long> bTreeIndex;
-        IDictionary<long, LogEntry<TOperation>> cache;
+        private Stream stream;
+        private ISerializer<LogEntry<TOperation>> serializer;
+        private BTree<long, long> bTreeIndex;
+        private IDictionary<long, LogEntry<TOperation>> cache;
 
         public StreamLog(Stream stream, ISerializer<LogEntry<TOperation>> serializer)
         {
@@ -28,7 +28,7 @@
             BuildIndex();
         }
 
-        void BuildIndex()
+        private void BuildIndex()
         {
             stream.Position = 0;
             var first = true;
@@ -47,7 +47,7 @@
             }
         }
 
-        void AddToCache(LogEntry<TOperation> entry)
+        private void AddToCache(LogEntry<TOperation> entry)
         {
             this.cache.Add(entry.Id.Index, entry);
             while (cache.Count > CACHE_SIZE)
@@ -99,7 +99,7 @@
             this.LastLogEntryId = sortedEntries.Last().Id;
         }
 
-        void Rewind(long index)
+        private void Rewind(long index)
         {
             var result = SetStreamPosition(index);
             if (!result) throw new ArgumentOutOfRangeException("cannot rewind stream to earlier position");
@@ -114,7 +114,7 @@
             // warning: this method does not update the LastLogEntryId
         }
 
-        bool SetStreamPosition(long index)
+        private bool SetStreamPosition(long index)
         {
             var indexEntry = this.bTreeIndex.Search(index);
             if (indexEntry != null)

@@ -7,7 +7,7 @@
 
     public class Node<TK, TP>
     {
-        private int degree;
+        private readonly int degree;
 
         public Node(int degree = 2)
         {
@@ -20,29 +20,11 @@
 
         public List<Entry<TK, TP>> Entries { get; set; }
 
-        public bool IsLeaf
-        {
-            get
-            {
-                return this.Children.Count == 0;
-            }
-        }
+        public bool IsLeaf => this.Children.Count == 0;
 
-        public bool HasReachedMaxEntries
-        {
-            get
-            {
-                return this.Entries.Count == (2 * this.degree) - 1;
-            }
-        }
+        public bool HasReachedMaxEntries => this.Entries.Count == (2 * this.degree) - 1;
 
-        public bool HasReachedMinEntries
-        {
-            get
-            {
-                return this.Entries.Count == this.degree - 1;
-            }
-        }
+        public bool HasReachedMinEntries => this.Entries.Count == this.degree - 1;
     }
 
     public class Entry<TK, TP> : IEquatable<Entry<TK, TP>>
@@ -57,7 +39,6 @@
         }
     }
 
-
     /// <summary>
     /// Based on BTree chapter in "Introduction to Algorithms", by Thomas Cormen, Charles Leiserson, Ronald Rivest.
     /// 
@@ -71,7 +52,7 @@
         {
             if (degree < 2)
             {
-                throw new ArgumentException("BTree degree must be at least 2", "degree");
+                throw new ArgumentException("BTree degree must be at least 2", nameof(degree));
             }
 
             this.Root = new Node<TK, TP>(degree);
@@ -81,7 +62,7 @@
 
         public Node<TK, TP> Root { get; private set; }
 
-        public int Degree { get; private set; }
+        public int Degree { get; }
 
         public int Height { get; private set; }
 
@@ -94,8 +75,7 @@
         {
             return this.SearchInternal(this.Root, key);
         }
-
-     
+        
         /// <summary>
         /// Inserts a new key associated with a pointer in the BTree. This
         /// operation splits nodes as required to keep the BTree properties.
@@ -112,7 +92,7 @@
             }
 
             // need to create new node and have it split
-            Node<TK, TP> oldRoot = this.Root;
+            var oldRoot = this.Root;
             this.Root = new Node<TK, TP>(this.Degree);
             this.Root.Children.Add(oldRoot);
             this.SplitChild(this.Root, 0, oldRoot);
@@ -145,7 +125,7 @@
         /// <param name="keyToDelete">Key to be deleted.</param>
         private void DeleteInternal(Node<TK, TP> node, TK keyToDelete)
         {
-            int i = node.Entries.TakeWhile(entry => keyToDelete.CompareTo(entry.Key) > 0).Count();
+            var i = node.Entries.TakeWhile(entry => keyToDelete.CompareTo(entry.Key) > 0).Count();
 
             // found key in node, so delete if from it
             if (i < node.Entries.Count && node.Entries[i].Key.CompareTo(keyToDelete) == 0)
@@ -169,18 +149,18 @@
         /// <param name="subtreeIndexInNode">Index of subtree node in the parent node.</param>
         private void DeleteKeyFromSubtree(Node<TK, TP> parentNode, TK keyToDelete, int subtreeIndexInNode)
         {
-            Node<TK, TP> childNode = parentNode.Children[subtreeIndexInNode];
+            var childNode = parentNode.Children[subtreeIndexInNode];
 
             // node has reached min # of entries, and removing any from it will break the btree property,
             // so this block makes sure that the "child" has at least "degree" # of nodes by moving an 
             // entry from a sibling node or merging nodes
             if (childNode.HasReachedMinEntries)
             {
-                int leftIndex = subtreeIndexInNode - 1;
-                Node<TK, TP> leftSibling = subtreeIndexInNode > 0 ? parentNode.Children[leftIndex] : null;
+                var leftIndex = subtreeIndexInNode - 1;
+                var leftSibling = subtreeIndexInNode > 0 ? parentNode.Children[leftIndex] : null;
 
-                int rightIndex = subtreeIndexInNode + 1;
-                Node<TK, TP> rightSibling = subtreeIndexInNode < parentNode.Children.Count - 1
+                var rightIndex = subtreeIndexInNode + 1;
+                var rightSibling = subtreeIndexInNode < parentNode.Children.Count - 1
                                                 ? parentNode.Children[rightIndex]
                                                 : null;
 
@@ -270,19 +250,19 @@
                 return;
             }
 
-            Node<TK, TP> predecessorChild = node.Children[keyIndexInNode];
+            var predecessorChild = node.Children[keyIndexInNode];
             if (predecessorChild.Entries.Count >= this.Degree)
             {
-                Entry<TK, TP> predecessorEntry = this.GetLastEntry(predecessorChild);
+                var predecessorEntry = this.GetLastEntry(predecessorChild);
                 this.DeleteInternal(predecessorChild, predecessorEntry.Key);
                 node.Entries[keyIndexInNode] = predecessorEntry;
             }
             else
             {
-                Node<TK, TP> successorChild = node.Children[keyIndexInNode + 1];
+                var successorChild = node.Children[keyIndexInNode + 1];
                 if (successorChild.Entries.Count >= this.Degree)
                 {
-                    Entry<TK, TP> successorEntry = this.GetFirstEntry(successorChild);
+                    var successorEntry = this.GetFirstEntry(successorChild);
                     this.DeleteInternal(successorChild, successorEntry.Key);
                     node.Entries[keyIndexInNode] = successorEntry;
                 }
@@ -310,9 +290,7 @@
                 return node.Entries.Last();
             }
 
-            return this.GetLastEntry(
-                node.Children.Last()
-            );
+            return this.GetLastEntry(node.Children.Last());
         }
 
         /// <summary>
@@ -325,9 +303,7 @@
                 return node.Entries.First();
             }
 
-            return this.GetFirstEntry(
-                node.Children.First()
-            );
+            return this.GetFirstEntry(node.Children.First());
         }
 
         /// <summary>
@@ -338,7 +314,7 @@
         /// <returns>Entry object with key information if found, null otherwise.</returns>
         private Entry<TK, TP> SearchInternal(Node<TK, TP> node, TK key)
         {
-            int i = node.Entries.TakeWhile(entry => key.CompareTo(entry.Key) > 0).Count();
+            var i = node.Entries.TakeWhile(entry => key.CompareTo(entry.Key) > 0).Count();
 
             if (i < node.Entries.Count && node.Entries[i].Key.CompareTo(key) == 0)
             {
@@ -347,8 +323,6 @@
 
             return node.IsLeaf ? null : this.SearchInternal(node.Children[i], key);
         }
-
-        
 
         /// <summary>
         /// Helper method that splits a full node into two nodes.
@@ -377,7 +351,7 @@
 
         private void InsertNonFull(Node<TK, TP> node, TK newKey, TP newPointer)
         {
-            int positionToInsert = node.Entries.TakeWhile(entry => newKey.CompareTo(entry.Key) >= 0).Count();
+            var positionToInsert = node.Entries.TakeWhile(entry => newKey.CompareTo(entry.Key) >= 0).Count();
 
             // leaf node
             if (node.IsLeaf)
@@ -387,7 +361,7 @@
             }
 
             // non-leaf
-            Node<TK, TP> child = node.Children[positionToInsert];
+            var child = node.Children[positionToInsert];
             if (child.HasReachedMaxEntries)
             {
                 this.SplitChild(node, positionToInsert, child);

@@ -3,11 +3,10 @@
     using ProtoBuf.Meta;
     using System;
     using System.IO;
-    using System.Threading.Tasks;
 
     public class ProtobufSerializer<T> : ISerializer<T> where T:new()
     {
-        TypeModel model;
+        private readonly TypeModel model;
 
         public ProtobufSerializer(params Type[] subTypes)
         {

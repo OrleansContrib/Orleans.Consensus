@@ -3,11 +3,10 @@ namespace Orleans.Consensus.Contract.Log
     using System;
 
     using Orleans.Concurrency;
-    using ProtoBuf;
+
     [Immutable]
     public struct LogEntryId : IEquatable<LogEntryId>, IComparable<LogEntryId>
     {
-
         public LogEntryId(long term, long index)
         {
             if (term < 0)
@@ -160,7 +159,7 @@ namespace Orleans.Consensus.Contract.Log
     }
 
     /// <summary>
-    /// A mutable version of LogEntryId, for use by the ProtoBuf serializer
+    /// A mutable version of <see cref="LogEntryId"/>, for use by the ProtoBuf serializer
     /// </summary>
     public struct MutableLogEntryId
     {
@@ -168,6 +167,7 @@ namespace Orleans.Consensus.Contract.Log
         {
             return new LogEntryId(surrogate.Term, surrogate.Index);
         }
+
         public static implicit operator MutableLogEntryId(LogEntryId surrogate)
         {
             return new MutableLogEntryId { Term = surrogate.Term, Index = surrogate.Index };
@@ -176,6 +176,5 @@ namespace Orleans.Consensus.Contract.Log
         public long Term { get; set; }
 
         public long Index { get; set; }
-
     }
 }

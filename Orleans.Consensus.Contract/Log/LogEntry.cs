@@ -3,13 +3,11 @@ namespace Orleans.Consensus.Contract.Log
     using System;
 
     using Orleans.Concurrency;
-    using ProtoBuf;
 
     [Immutable]
     [Serializable]
     public struct LogEntry<TOperation>
     {
-
         public LogEntry(LogEntryId entryId, TOperation operation)
         {
             this.Id = entryId;
@@ -32,17 +30,16 @@ namespace Orleans.Consensus.Contract.Log
         }
     }
 
-
     /// <summary>
-    /// A mutable version of MutableLogEntry<TOperation>, for use by the ProtoBuf serializer
+    /// A mutable version of <see cref="MutableLogEntry{TOperation}"/>, for use by the ProtoBuf serializer.
     /// </summary>
-
     public struct MutableLogEntry<TOperation>
     {
         public static implicit operator LogEntry<TOperation>(MutableLogEntry<TOperation> surrogate)
         {
             return new LogEntry<TOperation>(surrogate.Id, surrogate.Operation);
         }
+
         public static implicit operator MutableLogEntry<TOperation>(LogEntry<TOperation> surrogate)
         {
             return new MutableLogEntry<TOperation> { Id = surrogate.Id, Operation = surrogate.Operation };
@@ -51,6 +48,5 @@ namespace Orleans.Consensus.Contract.Log
         public TOperation Operation { get; set; }
 
         public LogEntryId Id { get; set; }
-
     }
 }

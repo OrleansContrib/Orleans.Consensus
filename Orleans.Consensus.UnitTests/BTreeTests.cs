@@ -9,8 +9,8 @@
 
     public class BTreeTests
     {
-        int[] testKeyData = new int[] { 10, 20, 30, 50 };
-        int[] testPointerData = new int[] { 50, 60, 40, 20 };
+        private int[] testKeyData = new int[] { 10, 20, 30, 50 };
+        private int[] testPointerData = new int[] { 50, 60, 40, 20 };
 
         [Fact]
         public void BTreeIsCreatedEmpty()
@@ -156,7 +156,7 @@
             }
         }
 
-        void RunBruteForce()
+        private void RunBruteForce()
         {
             var degree = 2;
 
@@ -184,7 +184,7 @@
             }
         }
 
-        void CheckNode(Node<string, int> node, int degree)
+        private void CheckNode(Node<string, int> node, int degree)
         {
 
             (node.Children.Count > 0 && node.Children.Count != node.Entries.Count + 1)
@@ -206,18 +206,18 @@
             }
         }
 
-        void InsertTestData(BTree<int, int> btree, int testDataIndex)
+        private void InsertTestData(BTree<int, int> btree, int testDataIndex)
         {
             btree.Insert(this.testKeyData[testDataIndex], this.testPointerData[testDataIndex]);
         }
 
-        void InsertTestDataAndValidateTree(BTree<int, int> btree, int testDataIndex)
+        private void InsertTestDataAndValidateTree(BTree<int, int> btree, int testDataIndex)
         {
             btree.Insert(this.testKeyData[testDataIndex], this.testPointerData[testDataIndex]);
             ValidateTree(btree.Root, 2, this.testKeyData.Take(testDataIndex + 1).ToArray());
         }
 
-        void SearchTestData(BTree<int, int> btree, int testKeyDataIndex)
+        private void SearchTestData(BTree<int, int> btree, int testKeyDataIndex)
         {
             for (int i = 0; i <= testKeyDataIndex; i++)
             {
@@ -227,7 +227,7 @@
             }
         }
 
-        static void ValidateTree(Node<int, int> tree, int degree, params int[] expectedKeys)
+        private static void ValidateTree(Node<int, int> tree, int degree, params int[] expectedKeys)
         {
             var foundKeys = new Dictionary<int, List<Entry<int, int>>>();
             ValidateSubtree(tree, tree, degree, int.MinValue, int.MaxValue, foundKeys);
@@ -239,7 +239,7 @@
             }
         }
 
-        static void UpdateFoundKeys(Dictionary<int, List<Entry<int, int>>> foundKeys, Entry<int, int> entry)
+        private static void UpdateFoundKeys(Dictionary<int, List<Entry<int, int>>> foundKeys, Entry<int, int> entry)
         {
             List<Entry<int, int>> foundEntries;
             if (!foundKeys.TryGetValue(entry.Key, out foundEntries))
@@ -251,7 +251,7 @@
             foundEntries.Add(entry);
         }
 
-        static void ValidateSubtree(Node<int, int> root, Node<int, int> node, int degree, int nodeMin, int nodeMax, Dictionary<int, List<Entry<int, int>>> foundKeys)
+        private static void ValidateSubtree(Node<int, int> root, Node<int, int> node, int degree, int nodeMin, int nodeMax, Dictionary<int, List<Entry<int, int>>> foundKeys)
         {
             if (root != node)
             {

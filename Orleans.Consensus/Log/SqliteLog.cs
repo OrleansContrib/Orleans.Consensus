@@ -1,7 +1,6 @@
 ﻿using Orleans.Consensus.Contract.Log;
 using System;
 using System.Collections.Generic;
-using System.Data;
 using System.Data.SQLite;
 using System.IO;
 using System.Linq;
@@ -36,7 +35,7 @@ namespace Orleans.Consensus.Log
             };
         }
 
-        static byte[] ToByteArray<T>(T value, ISerializer<T> serializer)
+        private static byte[] ToByteArray<T>(T value, ISerializer<T> serializer)
         {
             using (var memoryStream = new MemoryStream())
             {
@@ -48,7 +47,7 @@ namespace Orleans.Consensus.Log
             }
         }
 
-        static T FromByteArray<T>(byte[] value, ISerializer<T> serializer)
+        private static T FromByteArray<T>(byte[] value, ISerializer<T> serializer)
         {
             using (var memoryStream = new MemoryStream())
             {
@@ -64,8 +63,8 @@ namespace Orleans.Consensus.Log
 
     public class SqliteLog<TOperation> : IPersistentLog<TOperation>, IDisposable
     {
-        ISerializer<TOperation> serializer;
-        SQLiteConnection connection;
+        private ISerializer<TOperation> serializer;
+        private SQLiteConnection connection;
 
         public SqliteLog(string databaseFilename, ISerializer<TOperation> serializer)
         {
@@ -88,7 +87,7 @@ namespace Orleans.Consensus.Log
             }
         }
 
-        IEnumerable<string> Schema()
+        private IEnumerable<string> Schema()
         {
             yield return "CREATE TABLE log ([index] INTEGER PRIMARY KEY ASC, [term] INTEGER, [value] BLOB);";
         }
