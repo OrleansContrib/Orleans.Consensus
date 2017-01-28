@@ -29,6 +29,7 @@
             model.Add(typeof(LogEntryId), false).SetSurrogate(typeof(MutableLogEntryId));
             model.Add(typeof(TestOperation), false).Add(Array.ConvertAll(typeof(TestOperation).GetProperties(), prop => prop.Name));
 
+            model.Add(typeof(ServiceConfiguration), false).Add(Array.ConvertAll(typeof(ServiceConfiguration).GetProperties(), prop => prop.Name));
 
             var serializer = new ProtobufSerializer<LogEntry<TestOperation>>(model);
             TestSerializer(serializer);
@@ -82,7 +83,7 @@
                 var clone3 = serializer.Deserialize(stream);
                 clone1.Operation.Should().NotBeNull();
                 clone2.Operation.Should().NotBeNull();
-                clone3.Operation.Should().BeNull();
+                clone3.IsOperation.Should().BeFalse();
 
                 clone1.Operation.StringValue.Should().Be("STRING");
                 clone2.Operation.StringValue.Should().Be("MODIFIED");

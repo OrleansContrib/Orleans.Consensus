@@ -1,7 +1,6 @@
 ﻿namespace Orleans.Consensus.Contract.Messages
 {
     using System;
-    using System.Collections.Generic;
     using System.Linq;
 
     using Orleans.Concurrency;
@@ -17,7 +16,7 @@
         /// <summary>
         /// Empty for heartbeat
         /// </summary>
-        public List<LogEntry<TOperation>> Entries { get; set; }
+        public LogEntry<TOperation>[] Entries { get; set; }
 
         public long LeaderCommitIndex { get; set; }
         public long Term { get; set; }

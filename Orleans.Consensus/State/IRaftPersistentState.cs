@@ -1,3 +1,5 @@
+using Orleans.Consensus.Contract.Log;
+
 namespace Orleans.Consensus.State
 {
     using System.Threading.Tasks;

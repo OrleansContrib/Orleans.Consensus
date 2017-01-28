@@ -1,4 +1,5 @@
 ﻿using System.Threading.Tasks;
+using Orleans.Consensus.Contract.Log;
 
 namespace Orleans.Consensus.UnitTests.Utilities
 {
@@ -14,5 +15,7 @@ namespace Orleans.Consensus.UnitTests.Utilities
             this.CurrentTerm = currentTerm;
             return Task.FromResult(0);
         }
+
+        public ServiceConfiguration ServiceConfiguration { get; set; }
     }
 }

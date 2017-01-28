@@ -123,7 +123,7 @@
             return new AppendResponse { Success = false, Term = this.persistentState.CurrentTerm };
         }
 
-        public Task<ICollection<LogEntry<TOperation>>> ReplicateOperations(ICollection<TOperation> operations)
+        public Task<LogEntry<TOperation>[]> ReplicateOperations(TOperation[] operations)
         {
             throw new NotLeaderException(this.volatileState.LeaderId);
         }

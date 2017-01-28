@@ -1,10 +1,10 @@
-﻿namespace Orleans.Consensus.UnitTests
+﻿using Autofac;
+
+namespace Orleans.Consensus.UnitTests
 {
     using System;
     using System.Threading.Tasks;
-
-    using AutofacContrib.NSubstitute;
-
+    
     using FluentAssertions;
 
     using NSubstitute;
@@ -24,21 +24,22 @@
 
         private readonly InMemoryPersistentState persistentState;
 
-        private readonly AutoSubstitute container;
-
         public RoleCoordinatorTests(ITestOutputHelper output)
         {
-            var builder = new AutoSubstitute();
-            builder.Provide<ILogger>(new TestLogger(output));
+            var builder = new ContainerBuilder();
+            builder.RegisterInstance<ILogger>(new TestLogger(output));
 
             this.persistentState = Substitute.ForPartsOf<InMemoryPersistentState>();
-            builder.Provide<IRaftPersistentState>(this.persistentState);
+            builder.RegisterInstance<IRaftPersistentState>(this.persistentState);
 
-            builder.ResolveAndSubstituteFor<FollowerRole<int>>();
+            builder.RegisterInstance(Substitute.For<IFollowerRole<int>>()).AsImplementedInterfaces().AsSelf();
+            builder.RegisterInstance(Substitute.For<ILeaderRole<int>>()).AsImplementedInterfaces().AsSelf();
+            builder.RegisterInstance(Substitute.For<ICandidateRole<int>>()).AsImplementedInterfaces().AsSelf();
 
             // After the container is configured, resolve required services.
-            this.coordinator = builder.Resolve<RoleCoordinator<int>>();
-            this.container = builder;
+            builder.RegisterType<RoleCoordinator<int>>().AsSelf().AsImplementedInterfaces().SingleInstance();
+            var container = builder.Build();
+            this.coordinator = container.Resolve<RoleCoordinator<int>>();
         }
 
         /// <summary>
@@ -163,7 +164,7 @@
         }
 
         /// <summary>
-        /// <see cref="IRoleCoordinator{TOperation}.StepDownIfGreaterTerm"/> transitions to follower if the given term
+        /// <see cref="IRoleCoordinator{TOperation}.StepDownIfGreaterTerm{T}"/> transitions to follower if the given term
         /// is greater.
         /// </summary>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
@@ -188,7 +189,7 @@
         }
 
         /// <summary>
-        /// <see cref="IRoleCoordinator{TOperation}.StepDownIfGreaterTerm"/> does not transition to follower if the
+        /// <see cref="IRoleCoordinator{TOperation}.StepDownIfGreaterTerm{T}"/> does not transition to follower if the
         /// given term is not greater.
         /// </summary>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>

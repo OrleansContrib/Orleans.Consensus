@@ -76,7 +76,7 @@ namespace Orleans.Consensus.Log
             return true;
         }
 
-        public virtual Task AppendOrOverwrite(IEnumerable<LogEntry<TOperation>> entries)
+        public virtual Task AppendOrOverwrite(LogEntry<TOperation>[] entries)
         {
             foreach (var entry in entries)
             {

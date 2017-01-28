@@ -1,6 +1,5 @@
 namespace Orleans.Consensus.Roles
 {
-    using System.Collections.Generic;
     using System.Threading.Tasks;
 
     using Orleans.Consensus.Contract.Log;
@@ -51,6 +50,6 @@ namespace Orleans.Consensus.Roles
         /// A collection of <see cref="LogEntry{TOperation}"/> matching the provided <paramref name="operations"/>,
         /// containing the identifier of the entries which will be replicated to followers.
         /// </returns>
-        Task<ICollection<LogEntry<TOperation>>> ReplicateOperations(ICollection<TOperation> operations);
+        Task<LogEntry<TOperation>[]> ReplicateOperations(TOperation[] operations);
     }
 }

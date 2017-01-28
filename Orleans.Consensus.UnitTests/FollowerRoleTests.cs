@@ -1,12 +1,11 @@
-﻿namespace Orleans.Consensus.UnitTests
+﻿using Autofac;
+
+namespace Orleans.Consensus.UnitTests
 {
     using System;
-    using System.Collections.Generic;
     using System.Linq;
     using System.Threading.Tasks;
-
-    using AutofacContrib.NSubstitute;
-
+    
     using FluentAssertions;
 
     using NSubstitute;
@@ -51,36 +50,43 @@
 
         public FollowerRoleTests(ITestOutputHelper output)
         {
-            var builder = new AutoSubstitute();
-            builder.Provide<ILogger>(new TestLogger(output));
+            var builder = new ContainerBuilder();
+            builder.RegisterInstance<ILogger>(new TestLogger(output));
 
             this.volatileState = new VolatileState();
-            builder.Provide<IRaftVolatileState>(this.volatileState);
+            builder.RegisterInstance<IRaftVolatileState>(this.volatileState);
 
             // Configure settings
-            this.settings = builder.Resolve<ISettings>();
+            this.settings = Substitute.For<ISettings>();
             this.settings.ApplyEntriesOnFollowers.Returns(true);
             this.settings.MinElectionTimeoutMilliseconds.Returns(MinElectionTime);
             this.settings.MaxElectionTimeoutMilliseconds.Returns(MaxElectionTime);
+            builder.RegisterInstance(this.settings);
 
             // Rig random number generator to always return the same value.
-            this.random = builder.Resolve<IRandom>();
+            this.random = Substitute.For<IRandom>();
             this.random.Next(Arg.Any<int>(), Arg.Any<int>()).Returns(RiggedRandomResult);
+            builder.RegisterInstance(this.random);
 
-            this.coordinator = builder.Resolve<IRoleCoordinator<int>>();
-            this.stateMachine = builder.Resolve<IStateMachine<int>>();
+            this.coordinator = Substitute.For<IRoleCoordinator<int>>();
+            builder.RegisterInstance(this.coordinator);
 
+            this.stateMachine = Substitute.For<IStateMachine<int>>();
+            builder.RegisterInstance(this.stateMachine);
+            
             this.timers = new MockTimers();
-            builder.Provide<RegisterTimerDelegate>(this.timers.RegisterTimer);
+            builder.RegisterInstance<RegisterTimerDelegate>(this.timers.RegisterTimer);
 
             this.persistentState = Substitute.ForPartsOf<InMemoryPersistentState>();
-            builder.Provide<IRaftPersistentState>(this.persistentState);
+            builder.RegisterInstance<IRaftPersistentState>(this.persistentState);
 
             this.journal = Substitute.ForPartsOf<InMemoryLog<int>>();
-            builder.Provide<IPersistentLog<int>>(this.journal);
+            builder.RegisterInstance<IPersistentLog<int>>(this.journal);
+
+            builder.RegisterType<FollowerRole<int>>().AsImplementedInterfaces().AsSelf();
 
             // After the container is configured, resolve required services.
-            this.role = builder.Resolve<FollowerRole<int>>();
+            this.role = builder.Build().Resolve<FollowerRole<int>>();
         }
 
         /// <summary>
@@ -172,7 +178,7 @@
                 Term = 1,
                 PreviousLogEntry = this.journal.LastLogEntryId,
                 Entries =
-                    new List<LogEntry<int>>
+                    new []
                     {
                         new LogEntry<int>(new LogEntryId(1, 2), 38),
                         new LogEntry<int>(new LogEntryId(1, 3), 98)
@@ -185,7 +191,7 @@
             // Check that the call succeeded and that the entries were written to the log.
             response.Success.Should().BeTrue();
             response.Term.Should().Be(1);
-            await this.journal.Received().AppendOrOverwrite(Arg.Any<IEnumerable<LogEntry<int>>>());
+            await this.journal.Received().AppendOrOverwrite(Arg.Any<LogEntry<int>[]>());
             this.journal.Entries.Skip(1).Should().BeEquivalentTo(request.Entries);
 
             // If a follower is in the same term as the leader, a call to UpdateTermAndVote should not occur.
@@ -210,7 +216,7 @@
             {
                 Term = 2,
                 PreviousLogEntry = new LogEntryId(2, 3),
-                Entries = new List<LogEntry<int>> { new LogEntry<int>(new LogEntryId(2, 4), 38) }
+                Entries = new [] { new LogEntry<int>(new LogEntryId(2, 4), 38) }
             };
             var response = await this.role.Append(request);
 
@@ -218,7 +224,7 @@
             response.Success.Should().BeFalse();
             response.Term.Should().Be(2);
             response.LastLogEntryId.Should().Be(this.journal.LastLogEntryId);
-            await this.journal.DidNotReceive().AppendOrOverwrite(Arg.Any<IEnumerable<LogEntry<int>>>());
+            await this.journal.DidNotReceive().AppendOrOverwrite(Arg.Any<LogEntry<int>[]>());
             await this.persistentState.DidNotReceive().UpdateTermAndVote(Arg.Any<string>(), Arg.Any<long>());
         }
 
@@ -239,7 +245,7 @@
             {
                 Term = 2,
                 PreviousLogEntry = new LogEntryId(1, 1),
-                Entries = new List<LogEntry<int>> { new LogEntry<int>(new LogEntryId(2, 2), 38) }
+                Entries = new [] { new LogEntry<int>(new LogEntryId(2, 2), 38) }
             };
             var response = await this.role.Append(request);
 
@@ -247,7 +253,7 @@
             response.Success.Should().BeTrue();
             response.Term.Should().Be(2);
             response.LastLogEntryId.Should().Be(this.journal.LastLogEntryId);
-            await this.journal.Received().AppendOrOverwrite(Arg.Any<IEnumerable<LogEntry<int>>>());
+            await this.journal.Received().AppendOrOverwrite(Arg.Any<LogEntry<int>[]>());
             this.journal.Entries.Skip(1).Should().BeEquivalentTo(request.Entries);
 
             // Ensure that the term was updated.
@@ -271,7 +277,7 @@
             {
                 Term = 1,
                 PreviousLogEntry = new LogEntryId(1, 1),
-                Entries = new List<LogEntry<int>> { new LogEntry<int>(new LogEntryId(1, 2), 38) }
+                Entries = new [] { new LogEntry<int>(new LogEntryId(1, 2), 38) }
             };
             var response = await this.role.Append(request);
 
@@ -279,7 +285,7 @@
             response.Success.Should().BeFalse();
             response.Term.Should().Be(2);
             response.LastLogEntryId.Should().Be(this.journal.LastLogEntryId);
-            await this.journal.DidNotReceive().AppendOrOverwrite(Arg.Any<IEnumerable<LogEntry<int>>>());
+            await this.journal.DidNotReceive().AppendOrOverwrite(Arg.Any<LogEntry<int>[]>());
         }
 
         /// <summary>
@@ -299,7 +305,7 @@
             {
                 Term = 2,
                 PreviousLogEntry = default(LogEntryId),
-                Entries = new List<LogEntry<int>> { new LogEntry<int>(new LogEntryId(2, 1), 38) }
+                Entries = new [] { new LogEntry<int>(new LogEntryId(2, 1), 38) }
             };
             var response = await this.role.Append(request);
 
@@ -502,7 +508,7 @@
                 Term = 1,
                 PreviousLogEntry = this.journal.LastLogEntryId,
                 Entries =
-                    new List<LogEntry<int>>
+                    new []
                     {
                         new LogEntry<int>(new LogEntryId(1, 2), 38),
                         new LogEntry<int>(new LogEntryId(1, 3), 98)
@@ -514,7 +520,7 @@
             // Check that the call succeeded and that the entries were written to the log.
             response.Success.Should().BeTrue();
             response.Term.Should().Be(1);
-            await this.journal.Received().AppendOrOverwrite(Arg.Any<IEnumerable<LogEntry<int>>>());
+            await this.journal.Received().AppendOrOverwrite(Arg.Any<LogEntry<int>[]>());
             this.journal.Entries.Skip(1).Should().BeEquivalentTo(request.Entries);
 
             // If a follower is in the same term as the leader, a call to UpdateTermAndVote should not occur.

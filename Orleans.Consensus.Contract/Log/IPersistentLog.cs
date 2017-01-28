@@ -15,6 +15,6 @@ namespace Orleans.Consensus.Contract.Log
 
         bool Contains(LogEntryId entryId);
 
-        Task AppendOrOverwrite(IEnumerable<LogEntry<TOperation>> entries);
+        Task AppendOrOverwrite(LogEntry<TOperation>[] entries);
     }
 }

@@ -35,7 +35,7 @@ namespace Orleans.Consensus.Roles
 
         public IRaftRole<TOperation> Role { get; private set; }
 
-        public async Task<bool> StepDownIfGreaterTerm(IMessage message)
+        public async Task<bool> StepDownIfGreaterTerm<T>(T message) where T : IMessage
         {
             // If RPC request or response contains term T > currentTerm: set currentTerm = T, convert
             // to follower (§5.1)

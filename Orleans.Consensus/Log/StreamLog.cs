@@ -9,12 +9,12 @@
 
     public class StreamLog<TOperation> : IPersistentLog<TOperation>, IDisposable
     {
-        private const int CACHE_SIZE = 1000;
+        private const int CacheSize = 1000;
 
-        private Stream stream;
-        private ISerializer<LogEntry<TOperation>> serializer;
-        private BTree<long, long> bTreeIndex;
-        private IDictionary<long, LogEntry<TOperation>> cache;
+        private readonly Stream stream;
+        private readonly ISerializer<LogEntry<TOperation>> serializer;
+        private readonly BTree<long, long> bTreeIndex;
+        private readonly IDictionary<long, LogEntry<TOperation>> cache;
 
         public StreamLog(Stream stream, ISerializer<LogEntry<TOperation>> serializer)
         {
@@ -24,7 +24,7 @@
             this.stream = stream;
             this.serializer = serializer;
             this.bTreeIndex = new BTree<long, long>();
-            this.cache = new Dictionary<long, LogEntry<TOperation>>(CACHE_SIZE);
+            this.cache = new Dictionary<long, LogEntry<TOperation>>(CacheSize);
             BuildIndex();
         }
 
@@ -50,7 +50,7 @@
         private void AddToCache(LogEntry<TOperation> entry)
         {
             this.cache.Add(entry.Id.Index, entry);
-            while (cache.Count > CACHE_SIZE)
+            while (cache.Count > CacheSize)
             {
                 // remove keys with lower indexes
                 cache.Remove(cache.Keys.Min());
@@ -60,7 +60,7 @@
         public LogEntryId LastLogEntryId { get; private set; }
         public LogEntryId FirstLogEntryId { get; private set; }
 
-        public async Task AppendOrOverwrite(IEnumerable<LogEntry<TOperation>> entries)
+        public async Task AppendOrOverwrite(LogEntry<TOperation>[] entries)
         {
             if (null == entries) throw new ArgumentNullException(nameof(entries));
 

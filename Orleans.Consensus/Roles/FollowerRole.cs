@@ -1,7 +1,6 @@
 ﻿namespace Orleans.Consensus.Roles
 {
     using System;
-    using System.Collections.Generic;
     using System.Linq;
     using System.Threading.Tasks;
 
@@ -72,7 +71,7 @@
             this.ResetElectionTimer();
         }
 
-        public Task<ICollection<LogEntry<TOperation>>> ReplicateOperations(ICollection<TOperation> operations)
+        public Task<LogEntry<TOperation>[]> ReplicateOperations(TOperation[] operations)
         {
             throw new NotLeaderException(this.volatileState.LeaderId);
         }
@@ -175,7 +174,7 @@
                 // Set the current leader, so that clients can be redirected.
                 this.volatileState.LeaderId = request.Leader;
 
-                if (request.Entries == null || request.Entries.Count == 0)
+                if (request.Entries == null || request.Entries.Length == 0)
                 {
                     //this.journalInfo($"heartbeat from {request.Leader}.");
                 }
@@ -185,6 +184,9 @@
                     // delete the existing entry and all that follow it (§5.3)
                     // 4. Append any new entries not already in the log.
                     await this.journal.AppendOrOverwrite(request.Entries);
+
+#warning account for candidate and failed configuration entries
+
                     this.logger.LogInfo($"Accepted append. Log is now: {this.journal.ProgressString()}");
                 }
 
@@ -254,7 +256,16 @@
                         .Take((int)(this.volatileState.CommitIndex - this.volatileState.LastApplied)))
                 {
                     this.logger.LogInfo($"Applying {entry}.");
-                    await this.stateMachine.Apply(entry);
+                    if (entry.IsOperation)
+                    {
+                        await this.stateMachine.Apply(entry);
+                    }
+
+                    if (entry.IsConfiguration)
+                    {
+                        // TODO: Configuration committed
+                    }
+
                     this.volatileState.LastApplied = entry.Id.Index;
                 }
             }

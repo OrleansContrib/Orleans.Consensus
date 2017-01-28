@@ -151,32 +151,54 @@ namespace Orleans.Consensus.Roles
             return new AppendResponse { Success = false, Term = this.persistentState.CurrentTerm };
         }
 
-        public async Task<ICollection<LogEntry<TOperation>>> ReplicateOperations(ICollection<TOperation> operations)
+        /// <summary>
+        /// Replicates a collection of operations to followers.
+        /// </summary>
+        /// <param name="operations"></param>
+        /// <returns></returns>
+        public async Task<LogEntry<TOperation>[]> ReplicateOperations(TOperation[] operations)
         {
-            ICollection<LogEntry<TOperation>> entries;
-            if (operations?.Count > 0)
-            {
-                this.logger.LogInfo($"Replicating {operations.Count} entries to {this.followers.Count} servers");
-            }
-
-            if (operations != null && operations.Count > 0)
+            LogEntry<TOperation>[] entries;
+            if (operations != null && operations.Length > 0)
             {
                 // Assign each operation an identifier, converting it into a log entry.
                 var nextIndex = this.journal.LastLogEntryId.Index + 1;
-                entries =
-                    operations.Select(
-                        entry =>
-                        new LogEntry<TOperation>(new LogEntryId(this.persistentState.CurrentTerm, nextIndex++), entry))
-                        .ToList();
-
-                await this.journal.AppendOrOverwrite(entries);
-                this.logger.LogInfo($"Leader log is: {this.journal.ProgressString()}");
+                entries = new LogEntry<TOperation>[operations.Length];
+                for (var i = 0; i < entries.Length; i++)
+                {
+                    entries[i] = new LogEntry<TOperation>(new LogEntryId(this.persistentState.CurrentTerm, nextIndex++), operations[i]);
+                }
             }
             else
             {
                 entries = null;
             }
 
+            await this.ReplicateEntries(entries);
+            return entries;
+        }
+
+        private async Task ReplicateEntries(LogEntry<TOperation>[] entries)
+        {
+            if (entries != null && entries.Length > 0)
+            {
+                this.logger.LogInfo($"Replicating {entries.Length} entries to {this.followers.Count} servers");
+                await this.journal.AppendOrOverwrite(entries);
+
+#warning account for candidate and failed (overwritten) configuration entries
+
+                this.logger.LogInfo($"Leader log is: {this.journal.ProgressString()}");
+            }
+
+            await this.Replicate();
+        }
+
+        /// <summary>
+        /// Performs a round of replication attempts on all followers.
+        /// </summary>
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+        private async Task Replicate()
+        {
             var tasks = new List<Task>(this.followers.Count);
             foreach (var server in this.followers)
             {
@@ -189,8 +211,6 @@ namespace Orleans.Consensus.Roles
                 await this.UpdateCommittedIndex();
                 this.madeProgress = false;
             }
-
-            return entries;
         }
 
         public Task SendHeartBeats()
@@ -221,7 +241,7 @@ namespace Orleans.Consensus.Roles
                     Entries =
                         this.journal.GetCursor((int)Math.Max(0, nextIndex - 1))
                             .Take(this.settings.MaxLogEntriesPerAppendRequest)
-                            .ToList()
+                            .ToArray()
                 };
 
                 if (nextIndex >= 2 && this.journal.LastLogEntryId.Index > nextIndex - 2)
@@ -230,7 +250,7 @@ namespace Orleans.Consensus.Roles
                 }
 
                 this.lastMessageSentTime = DateTime.UtcNow;
-                if (request.Entries.Count > 0)
+                if (request.Entries.Length > 0)
                 {
                     this.logger.LogInfo(
                         $"Replicating to '{serverId}': prev: {request.PreviousLogEntry},"
@@ -350,7 +370,16 @@ namespace Orleans.Consensus.Roles
                         .Take((int)(this.volatileState.CommitIndex - this.volatileState.LastApplied)))
                 {
                     this.logger.LogInfo($"Applying {entry}.");
-                    await this.stateMachine.Apply(entry);
+                    if (entry.IsOperation)
+                    {
+                        await this.stateMachine.Apply(entry);
+                    }
+
+                    if (entry.IsConfiguration)
+                    {
+#warning account for successful configuration commit.
+                    }
+
                     this.volatileState.LastApplied = entry.Id.Index;
                 }
             }

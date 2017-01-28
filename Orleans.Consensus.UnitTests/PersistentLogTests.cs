@@ -18,6 +18,7 @@
             model.Add(typeof(MutableLogEntryId), false).Add(Array.ConvertAll(typeof(LogEntryId).GetProperties(), prop => prop.Name));
             model.Add(typeof(LogEntryId), false).SetSurrogate(typeof(MutableLogEntryId));
             model.Add(typeof(TestOperation), false).Add(Array.ConvertAll(typeof(TestOperation).GetProperties(), prop => prop.Name));
+            model.Add(typeof(ServiceConfiguration), false).Add(Array.ConvertAll(typeof(ServiceConfiguration).GetProperties(), prop => prop.Name));
             return new ProtobufSerializer<LogEntry<TestOperation>>(model);
         }
 
@@ -53,7 +54,7 @@
 
         private void TestLog(IPersistentLog<TestOperation> log)
         {
-            var operations = new LogEntry<TestOperation>[]
+            var operations = new[]
             {
                 new LogEntry<TestOperation>(new LogEntryId(1, 1), new TestOperation { StringValue = "operation1" }),
                 new LogEntry<TestOperation>(new LogEntryId(1, 2), new TestOperation { StringValue = "operation2" }),
@@ -121,7 +122,5 @@
                 entries[2].Id.Should().Be(new LogEntryId(1, 3));
             }
         }
-
-
     }
 }

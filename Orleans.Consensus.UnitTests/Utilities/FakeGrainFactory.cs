@@ -31,7 +31,7 @@
 
         public FakeGrainFactory(IComponentContext container)
         {
-            this.container = container;
+            this.container = container.Resolve<IComponentContext>();
         }
 
         public Action<object, IGrain> OnGrainCreated { get; set; } = (_, __) => { };

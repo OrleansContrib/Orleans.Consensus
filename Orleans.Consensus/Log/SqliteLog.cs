@@ -55,15 +55,12 @@ namespace Orleans.Consensus.Log
                 memoryStream.Position = 0;
                 return serializer.Deserialize(memoryStream);
             }
-
         }
-
     }
-
-
+    
     public class SqliteLog<TOperation> : IPersistentLog<TOperation>, IDisposable
     {
-        private ISerializer<TOperation> serializer;
+        private readonly ISerializer<TOperation> serializer;
         private SQLiteConnection connection;
 
         public SqliteLog(string databaseFilename, ISerializer<TOperation> serializer)
@@ -80,7 +77,7 @@ namespace Orleans.Consensus.Log
             connection.Open();
             if (createSchema)
             {
-                foreach (var line in Schema())
+                foreach (var line in this.Schema())
                 {
                     connection.Execute(line);
                 }
@@ -102,7 +99,7 @@ namespace Orleans.Consensus.Log
             }
         }
 
-        public Task AppendOrOverwrite(IEnumerable<LogEntry<TOperation>> entries)
+        public Task AppendOrOverwrite(LogEntry<TOperation>[] entries)
         {
             if (null == entries) throw new ArgumentNullException(nameof(entries));
 
@@ -134,7 +131,7 @@ namespace Orleans.Consensus.Log
 
         public void Dispose()
         {
-            if (connection!=null) connection.Close();
+            this.connection?.Close();
             connection = null;
         }
 

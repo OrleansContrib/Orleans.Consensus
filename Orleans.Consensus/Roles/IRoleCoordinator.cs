@@ -38,7 +38,7 @@ namespace Orleans.Consensus.Roles
         /// </summary>
         /// <param name="message">The message.</param>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
-        Task<bool> StepDownIfGreaterTerm(IMessage message);
+        Task<bool> StepDownIfGreaterTerm<T>(T message) where T : IMessage;
 
         /// <summary>
         /// Initializes this instance.

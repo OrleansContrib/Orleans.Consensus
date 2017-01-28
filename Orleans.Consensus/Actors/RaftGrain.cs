@@ -1,7 +1,6 @@
 namespace Orleans.Consensus.Actors
 {
     using System;
-    using System.Collections.Generic;
     using System.Threading.Tasks;
 
     using Autofac;
@@ -46,7 +45,7 @@ namespace Orleans.Consensus.Actors
 
         protected Task AppendEntry(TOperation entry)
         {
-            return this.coordinator.Role.ReplicateOperations(new List<TOperation> { entry });
+            return this.coordinator.Role.ReplicateOperations(new [] { entry });
         }
 
         private string GetLogMessage(string message)
@@ -65,7 +64,7 @@ namespace Orleans.Consensus.Actors
             this.log = this.GetLogger($"{this.GetPrimaryKeyString()}");
             this.log.Info("Activating");
 
-            // TODO: Get servers from Orleans' memberhsip provider.
+            // TODO: Get servers from Orleans' membership provider.
             var allServers = new[] { "one", "two", "three" };
 
             var applicationContainerBuilder = new ContainerBuilder();

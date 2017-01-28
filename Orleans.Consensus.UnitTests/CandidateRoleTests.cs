@@ -6,8 +6,6 @@
 
     using Autofac;
 
-    using AutofacContrib.NSubstitute;
-
     using FluentAssertions;
 
     using NSubstitute;
@@ -54,64 +52,69 @@
 
         private readonly FakeGrainFactory grainFactory;
 
-        private readonly AutoSubstitute container;
+        private readonly IContainer container;
 
         public CandidateRoleTests(ITestOutputHelper output)
         {
-            var builder =
-                new AutoSubstitute(cb => cb.Register(_ => Substitute.For<IRaftGrain<int>>()).InstancePerDependency());
-            builder.Provide<ILogger>(new TestLogger(output));
+            var builder = new ContainerBuilder();
+            builder.Register(_ => Substitute.For<IRaftGrain<int>>()).InstancePerDependency();
+            builder.RegisterInstance<ILogger>(new TestLogger(output));
 
             this.volatileState = new VolatileState();
-            builder.Provide<IRaftVolatileState>(this.volatileState);
-
+            builder.RegisterInstance<IRaftVolatileState>(this.volatileState);
+            
             // Configure settings
-            this.settings = builder.Resolve<ISettings>();
+            this.settings = Substitute.For<ISettings>();
             this.settings.MinElectionTimeoutMilliseconds.Returns(MinElectionTime);
             this.settings.MaxElectionTimeoutMilliseconds.Returns(MaxElectionTime);
+            builder.RegisterInstance(this.settings);
 
             // Rig random number generator to always return the same value.
-            this.random = builder.Resolve<IRandom>();
+            this.random = Substitute.For<IRandom>();
             this.random.Next(Arg.Any<int>(), Arg.Any<int>()).Returns(RiggedRandomResult);
+            builder.RegisterInstance(this.random);
 
-            this.coordinator = builder.Resolve<IRoleCoordinator<int>>();
+            this.coordinator = Substitute.For<IRoleCoordinator<int>>();
             this.coordinator.StepDownIfGreaterTerm(Arg.Any<IMessage>())
                 .Returns(
                     info => Task.FromResult(((IMessage)info[0]).Term > this.persistentState.CurrentTerm));
-            var currentRole = builder.Resolve<IRaftRole<int>>();
+            var currentRole = Substitute.For<IRaftRole<int>>();
             currentRole.RequestVote(Arg.Any<RequestVoteRequest>())
                 .Returns(Task.FromResult(new RequestVoteResponse { Term = 1, VoteGranted = true }));
             currentRole.Append(Arg.Any<AppendRequest<int>>())
                 .Returns(Task.FromResult(new AppendResponse { Term = 1, Success = true }));
             this.coordinator.Role.Returns(currentRole);
+            builder.RegisterInstance(this.coordinator);
 
             this.timers = new MockTimers();
-            builder.Provide<RegisterTimerDelegate>(this.timers.RegisterTimer);
+            builder.RegisterInstance<RegisterTimerDelegate>(this.timers.RegisterTimer);
 
             this.persistentState = Substitute.ForPartsOf<InMemoryPersistentState>();
-            builder.Provide<IRaftPersistentState>(this.persistentState);
+            builder.RegisterInstance<IRaftPersistentState>(this.persistentState);
 
             this.journal = Substitute.ForPartsOf<InMemoryLog<int>>();
-            builder.Provide<IPersistentLog<int>>(this.journal);
+            builder.RegisterInstance<IPersistentLog<int>>(this.journal);
 
             this.identity = Substitute.For<IServerIdentity>();
             this.identity.Id.Returns(Guid.NewGuid().ToString());
-            builder.Provide(this.identity);
+            builder.RegisterInstance(this.identity);
 
-            this.members = builder.Resolve<StaticMembershipProvider>();
+            this.members = new StaticMembershipProvider(this.identity);
             this.members.SetServers(new[] { this.identity.Id, "other1", "other2", "other3", "other4" });
-            builder.Provide<IMembershipProvider>(this.members);
+            builder.RegisterInstance<IMembershipProvider>(this.members);
 
-            this.grainFactory = new FakeGrainFactory(builder.Container);
-            builder.Provide<IGrainFactory>(this.grainFactory);
+            builder.RegisterType<FakeGrainFactory>().AsImplementedInterfaces().AsSelf().SingleInstance();
+
+            // After the container is configured, resolve required services.
+            builder.RegisterType<CandidateRole<int>>().AsImplementedInterfaces().AsSelf().SingleInstance();
+            this.container = builder.Build();
+            this.role = this.container.Resolve<CandidateRole<int>>();
+            this.grainFactory = this.container.Resolve<FakeGrainFactory>();
+
             this.OnRaftGrainCreated =
                 (id, grain) =>
                 grain.RequestVote(Arg.Any<RequestVoteRequest>())
                     .Returns(Task.FromResult(new RequestVoteResponse { VoteGranted = true }));
-
-            // After the container is configured, resolve required services.
-            this.role = builder.Resolve<CandidateRole<int>>();
-            this.container = builder;
         }
 
         private Action<string, IRaftGrain<int>> OnRaftGrainCreated
@@ -321,7 +324,7 @@
             var request = new AppendRequest<int>
             {
                 Term = 1,
-                Entries = new List<LogEntry<int>> { new LogEntry<int>(new LogEntryId(1, 1), 8) }
+                Entries = new[] {new LogEntry<int>(new LogEntryId(1, 1), 8)}
             };
 
             // Check that append fails.
@@ -330,7 +333,7 @@
             response.Term.Should().Be(2);
 
             // Check that the no entries were written to the log.
-            await this.journal.DidNotReceive().AppendOrOverwrite(Arg.Any<IEnumerable<LogEntry<int>>>());
+            await this.journal.DidNotReceive().AppendOrOverwrite(Arg.Any<LogEntry<int>[]>());
 
             // Check that the role did not transition into a follower.
             await this.coordinator.DidNotReceive().BecomeFollowerForTerm(Arg.Any<long>());
