@@ -1,4 +1,6 @@
-﻿namespace Orleans.Consensus.Log
+﻿using Orleans.Consensus.Contract;
+
+namespace Orleans.Consensus.Log
 {
     using Orleans.Consensus.Contract.Log;
     using System;

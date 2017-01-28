@@ -1,82 +1,77 @@
+using Bond;
+using Bond.Expressions;
+using Bond.Tag;
+
 namespace Orleans.Consensus.Contract.Log
 {
     using System;
-
-    using Orleans.Concurrency;
-
+    
     [Serializable]
-    [Immutable]
+    [Schema]
     public class ServiceConfiguration
     {
-        public ServiceConfiguration(string[] members)
-        {
-            this.Members = members;
-        }
-
+        [Id(0)]
         public string[] Members { get; set;  }
     }
-
-    [Immutable]
+    
     [Serializable]
+    [Schema]
     public struct LogEntry<TOperation>
     {
-        private readonly TOperation operation;
-        private readonly ServiceConfiguration configuration;
-
         public LogEntry(LogEntryId entryId, TOperation operation)
         {
             this.Id = entryId;
-            this.operation = operation;
+            this.Operation = new Bonded<TOperation>(operation);
+            this.Configuration = null;
             this.Kind = LogEntryKind.Operation;
-            this.configuration = null;
         }
 
         public LogEntry(LogEntryId entryId, ServiceConfiguration configuration)
         {
             this.Id = entryId;
-            this.operation = default(TOperation);
+            this.Operation = null;
+            this.Configuration = new Bonded<ServiceConfiguration>(configuration);
             this.Kind = LogEntryKind.Configuration;
-            this.configuration = configuration;
         }
+        
+        /// <summary>
+        /// The id.
+        /// </summary>
+        [Id(0)]
+        public LogEntryId Id { get; set; }
 
         /// <summary>
-        /// The kind of this log entry.
+        /// The kind of this log entry, which informs deserialization.
         /// </summary>
-        public LogEntryKind Kind { get; }
+        [Id(1)]
+        public LogEntryKind Kind { get; set; }
 
-        /// <summary>
-        /// If <see cref="Kind"/> is <see cref="LogEntryKind.Operation"/>, then the operation.
-        /// </summary>
-        public TOperation Operation
-        {
-            get
-            {
-                this.ThrowIfIncorrectKind(LogEntryKind.Operation);
-                return this.operation;
-            }
-        }
-
-        /// <summary>
-        /// If <see cref="Kind"/> is <see cref="LogEntryKind.Configuration"/>, then the configuration.
-        /// </summary>
-        public ServiceConfiguration Configuration
+        [Id(2)]
+        public IBonded<TOperation> Operation { get; set; }
+        [Id(3)]
+        public IBonded<ServiceConfiguration> Configuration { get; set; }
+        /*
+                public TOperation Operation
+                {
+                    get
+                    {
+                        this.ThrowIfIncorrectKind(LogEntryKind.Operation);
+                        return this.Payload.Deserialize<TOperation>();
+                    }
+                }*/
+/*        public ServiceConfiguration Configuration
         {
             get
             {
                 this.ThrowIfIncorrectKind(LogEntryKind.Configuration);
-                return this.configuration;
+                return this.Payload.Deserialize<ServiceConfiguration>();
             }
-        }
+        }*/
 
-        public LogEntryId Id { get; }
-
-        private void ThrowIfIncorrectKind(LogEntryKind expectedKind)
+        private void ThrowIfIncorrectKind(LogEntryKind requiredKind)
         {
-            if (this.Kind != expectedKind)
-            {
-                throw new InvalidOperationException(
-                    $"Accessed {this} as though it were of incorrect kind, {expectedKind}.");
-            }
+            if (this.Kind != requiredKind)
+                throw new InvalidOperationException($"Cannot deserialize entry of kind {this.Kind} as {requiredKind}.");
         }
 
         /// <summary>
@@ -87,7 +82,8 @@ namespace Orleans.Consensus.Contract.Log
         /// </returns>
         public override string ToString()
         {
-            return $"Entry({this.Id}, Kind: {this.Kind}, Op: {this.operation}, Config: {this.configuration}";
+            return
+                $"Entry({this.Id}, {this.Kind})";
         }
 
         public bool IsConfiguration => this.Kind == LogEntryKind.Configuration;
@@ -103,46 +99,5 @@ namespace Orleans.Consensus.Contract.Log
         Invalid,
         Operation,
         Configuration
-    }
-
-    /// <summary>
-    /// A mutable version of <see cref="MutableLogEntry{TOperation}"/>, for use by the ProtoBuf serializer.
-    /// </summary>
-    public class MutableLogEntry<TOperation>
-    {
-        public static implicit operator LogEntry<TOperation>(MutableLogEntry<TOperation> surrogate)
-        {
-            switch (surrogate.Kind)
-            {
-                case LogEntryKind.Operation:
-                    return new LogEntry<TOperation>(surrogate.Id, surrogate.Operation);
-                case LogEntryKind.Configuration:
-                    return new LogEntry<TOperation>(surrogate.Id, surrogate.Configuration);
-                default:
-                    throw new ArgumentOutOfRangeException(
-                        $"Unsupported kind, {surrogate.Kind} for type {nameof(MutableLogEntry<TOperation>)}.");
-            }
-        }
-
-        public static implicit operator MutableLogEntry<TOperation>(LogEntry<TOperation> surrogate)
-        {
-            var result = new MutableLogEntry<TOperation>
-            {
-                Id = surrogate.Id,
-                Kind = surrogate.Kind,
-            };
-
-            if (surrogate.IsOperation) result.Operation = surrogate.Operation;
-            if (surrogate.IsConfiguration) result.Configuration = surrogate.Configuration;
-            return result;
-        }
-
-        public TOperation Operation { get; set; }
-
-        public LogEntryId Id { get; set; }
-
-        public LogEntryKind Kind { get; set; }
-
-        public ServiceConfiguration Configuration { get; set; }
     }
 }

@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Dapper;
+using Orleans.Consensus.Contract;
 
 namespace Orleans.Consensus.Log
 {
@@ -31,7 +32,7 @@ namespace Orleans.Consensus.Log
             {
                 Index = entry.Id.Index,
                 Term = entry.Id.Term,
-                Value = ToByteArray(entry.Operation, serializer)
+                Value = ToByteArray(entry.Operation.Deserialize(), serializer)
             };
         }
 

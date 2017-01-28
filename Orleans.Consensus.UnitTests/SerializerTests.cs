@@ -1,37 +1,36 @@
-﻿namespace Orleans.Consensus.UnitTests
+﻿using Bond;
+using Orleans.Consensus.Contract;
+
+namespace Orleans.Consensus.UnitTests
 {
     using Orleans.Consensus.Contract.Log;
     using Orleans.Consensus.Log;
     using System.IO;
     using Xunit;
     using FluentAssertions;
-    using System;
-    using ProtoBuf.Meta;
 
-    
+    [Schema]
     public class TestOperation
     {
+        [Id(0)]
         public string StringValue { get; set; }
+
+        [Id(1)]
         public int IntValue { get; set; }
+
+        [Id(2)]
         public bool BoolValue { get; set; }
+
+        [Id(3)]
         public int[] ArrayValue { get; set; }
     }
 
     public class SerializerTests
     {
         [Fact]
-        public void ProtobufSerializerCanSerializeAndDeserialize()
+        public void BondSerializerCanSerializeAndDeserialize()
         {
-            var model = TypeModel.Create();
-            model.Add(typeof(MutableLogEntry<TestOperation>), false).Add(Array.ConvertAll(typeof(MutableLogEntry<TestOperation>).GetProperties(), prop => prop.Name));
-            model.Add(typeof(LogEntry<TestOperation>), false).SetSurrogate(typeof(MutableLogEntry<TestOperation>));
-            model.Add(typeof(MutableLogEntryId), false).Add(Array.ConvertAll(typeof(LogEntryId).GetProperties(), prop => prop.Name));
-            model.Add(typeof(LogEntryId), false).SetSurrogate(typeof(MutableLogEntryId));
-            model.Add(typeof(TestOperation), false).Add(Array.ConvertAll(typeof(TestOperation).GetProperties(), prop => prop.Name));
-
-            model.Add(typeof(ServiceConfiguration), false).Add(Array.ConvertAll(typeof(ServiceConfiguration).GetProperties(), prop => prop.Name));
-
-            var serializer = new ProtobufSerializer<LogEntry<TestOperation>>(model);
+            var serializer = new BondSerializer<LogEntry<TestOperation>>();
             TestSerializer(serializer);
         }
 
@@ -66,13 +65,15 @@
                 clone.Id.Term.Should().Be(1);
                 clone.Id.Index.Should().Be(2);
                 clone.Operation.Should().NotBeNull();
-                clone.Operation.StringValue.Should().Be("STRING");
-                clone.Operation.BoolValue.Should().BeTrue();
-                clone.Operation.IntValue.Should().Be(42);
-                clone.Operation.ArrayValue.Should().HaveCount(4);
+                var op = clone.Operation.Deserialize();
+                op.StringValue.Should().Be("STRING");
+                op.BoolValue.Should().BeTrue();
+                op.IntValue.Should().Be(42);
+                op.ArrayValue.Should().HaveCount(4);
 
                 // write the clone to the stream (as a second entry)
-                clone.Operation.StringValue = "MODIFIED";
+                op.StringValue = "MODIFIED";
+                serializer.Serialize(clone, stream);
                 serializer.Serialize(clone, stream);
 
                 // read the stream back, we expect to find 2 entries
@@ -80,13 +81,11 @@
                 stream.Position = 0;
                 var clone1 = serializer.Deserialize(stream);
                 var clone2 = serializer.Deserialize(stream);
-                var clone3 = serializer.Deserialize(stream);
                 clone1.Operation.Should().NotBeNull();
                 clone2.Operation.Should().NotBeNull();
-                clone3.IsOperation.Should().BeFalse();
 
-                clone1.Operation.StringValue.Should().Be("STRING");
-                clone2.Operation.StringValue.Should().Be("MODIFIED");
+                clone1.Operation.Deserialize().StringValue.Should().Be("STRING");
+                clone2.Operation.Deserialize().StringValue.Should().Be("MODIFIED");
             }
 
         }
