@@ -5,7 +5,12 @@ using Bond.Tag;
 namespace Orleans.Consensus.Contract.Log
 {
     using System;
-    
+
+
+
+    // TODO: Port to Hagar
+
+
     [Serializable]
     [Schema]
     public class ServiceConfiguration
