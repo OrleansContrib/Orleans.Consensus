@@ -1,15 +1,17 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
 namespace Orleans.Consensus.Roles
 {
     using System;
     using System.Threading.Tasks;
-
-    using Orleans.Consensus.Contract;
     using Orleans.Consensus.Contract.Messages;
     using Orleans.Consensus.State;
 
     internal class RoleCoordinator<TOperation> : IRoleCoordinator<TOperation>
     {
         private readonly ILogger logger;
+        private readonly IServiceProvider serviceProvider;
 
         private readonly Func<IFollowerRole<TOperation>> createFollowerRole;
 
@@ -21,16 +23,15 @@ namespace Orleans.Consensus.Roles
 
         public RoleCoordinator(
             IRaftPersistentState persistentState,
-            ILogger logger,
-            Func<IFollowerRole<TOperation>> createFollowerRole,
-            Func<ICandidateRole<TOperation>> createCandidateRole,
-            Func<ILeaderRole<TOperation>> createLeaderRole)
+            ILogger<RoleCoordinator<TOperation>> logger,
+            IServiceProvider serviceProvider)
         {
             this.persistentState = persistentState;
             this.logger = logger;
-            this.createFollowerRole = createFollowerRole;
-            this.createCandidateRole = createCandidateRole;
-            this.createLeaderRole = createLeaderRole;
+            this.serviceProvider = serviceProvider;
+            this.createFollowerRole = serviceProvider.GetRequiredService<IFollowerRole<TOperation>>;
+            this.createCandidateRole = serviceProvider.GetRequiredService<ICandidateRole<TOperation>>;
+            this.createLeaderRole = serviceProvider.GetRequiredService<ILeaderRole<TOperation>>;
         }
 
         public IRaftRole<TOperation> Role { get; private set; }
@@ -41,7 +42,7 @@ namespace Orleans.Consensus.Roles
             // to follower (§5.1)
             if (message.Term > this.persistentState.CurrentTerm)
             {
-                this.logger.LogInfo(
+                this.logger.LogInformation(
                     $"Stepping down for term {message.Term}, which is greater than current term, {this.persistentState.CurrentTerm}.");
                 await ((IRoleCoordinator<TOperation>)this).BecomeFollowerForTerm(message.Term);
                 return true;

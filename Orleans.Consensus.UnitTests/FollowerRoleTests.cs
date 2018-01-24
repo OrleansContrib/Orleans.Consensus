@@ -1,27 +1,28 @@
 ﻿using Autofac;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using System;
+using System.Linq;
+using System.Threading.Tasks;
+
+using FluentAssertions;
+using Microsoft.Extensions.Options;
+using NSubstitute;
+
+using Orleans.Consensus.Actors;
+using Orleans.Consensus.Contract;
+using Orleans.Consensus.Contract.Log;
+using Orleans.Consensus.Contract.Messages;
+using Orleans.Consensus.Log;
+using Orleans.Consensus.Roles;
+using Orleans.Consensus.State;
+using Orleans.Consensus.UnitTests.Utilities;
+
+using Xunit;
+using Xunit.Abstractions;
 
 namespace Orleans.Consensus.UnitTests
 {
-    using System;
-    using System.Linq;
-    using System.Threading.Tasks;
-    
-    using FluentAssertions;
-
-    using NSubstitute;
-
-    using Orleans.Consensus.Actors;
-    using Orleans.Consensus.Contract;
-    using Orleans.Consensus.Contract.Log;
-    using Orleans.Consensus.Contract.Messages;
-    using Orleans.Consensus.Log;
-    using Orleans.Consensus.Roles;
-    using Orleans.Consensus.State;
-    using Orleans.Consensus.UnitTests.Utilities;
-
-    using Xunit;
-    using Xunit.Abstractions;
-
     public class FollowerRoleTests
     {
         private const int MinElectionTime = 72;
@@ -38,55 +39,59 @@ namespace Orleans.Consensus.UnitTests
 
         private readonly IRandom random;
 
-        private readonly FollowerRole<int> role;
+        private readonly IFollowerRole<int> role;
 
-        private readonly ISettings settings;
+        private readonly ReplicaSetOptions settings;
 
         private readonly IStateMachine<int> stateMachine;
 
         private readonly MockTimers timers;
 
         private readonly VolatileState volatileState;
+        private readonly ReplicaSetOptions replicaSetOptions;
 
         public FollowerRoleTests(ITestOutputHelper output)
         {
-            var builder = new ContainerBuilder();
-            builder.RegisterInstance<ILogger>(new TestLogger(output));
+            var serviceCollection = new ServiceCollection();
+            serviceCollection.AddLogging(loggingBuilder => loggingBuilder.AddProvider(new XunitLoggerProvider(output)));
 
             this.volatileState = new VolatileState();
-            builder.RegisterInstance<IRaftVolatileState>(this.volatileState);
+            serviceCollection.AddSingleton<IRaftVolatileState>(this.volatileState);
 
             // Configure settings
-            this.settings = Substitute.For<ISettings>();
-            this.settings.ApplyEntriesOnFollowers.Returns(true);
-            this.settings.MinElectionTimeoutMilliseconds.Returns(MinElectionTime);
-            this.settings.MaxElectionTimeoutMilliseconds.Returns(MaxElectionTime);
-            builder.RegisterInstance(this.settings);
+            this.replicaSetOptions = new ReplicaSetOptions
+            {
+                ApplyEntriesOnFollowers = true,
+                MinElectionTimeoutMilliseconds = MinElectionTime,
+                MaxElectionTimeoutMilliseconds = MaxElectionTime
+            };
+            serviceCollection.AddSingleton(Options.Create(replicaSetOptions));
 
             // Rig random number generator to always return the same value.
             this.random = Substitute.For<IRandom>();
             this.random.Next(Arg.Any<int>(), Arg.Any<int>()).Returns(RiggedRandomResult);
-            builder.RegisterInstance(this.random);
+            serviceCollection.AddSingleton(this.random);
 
             this.coordinator = Substitute.For<IRoleCoordinator<int>>();
-            builder.RegisterInstance(this.coordinator);
+            serviceCollection.AddSingleton(this.coordinator);
 
             this.stateMachine = Substitute.For<IStateMachine<int>>();
-            builder.RegisterInstance(this.stateMachine);
-            
+            serviceCollection.AddSingleton(this.stateMachine);
+
             this.timers = new MockTimers();
-            builder.RegisterInstance<RegisterTimerDelegate>(this.timers.RegisterTimer);
+            serviceCollection.AddSingleton<RegisterTimerDelegate>(this.timers.RegisterTimer);
 
             this.persistentState = Substitute.ForPartsOf<InMemoryPersistentState>();
-            builder.RegisterInstance<IRaftPersistentState>(this.persistentState);
+            serviceCollection.AddSingleton<IRaftPersistentState>(this.persistentState);
 
             this.journal = Substitute.ForPartsOf<InMemoryLog<int>>();
-            builder.RegisterInstance<IPersistentLog<int>>(this.journal);
-
-            builder.RegisterType<FollowerRole<int>>().AsImplementedInterfaces().AsSelf();
+            serviceCollection.AddSingleton<IPersistentLog<int>>(this.journal);
+            serviceCollection.AddSingleton<IFollowerRole<int>, FollowerRole<int>>();
 
             // After the container is configured, resolve required services.
-            this.role = builder.Build().Resolve<FollowerRole<int>>();
+            var serviceProvider = serviceCollection.BuildServiceProvider();
+            this.role = serviceProvider.GetRequiredService<IFollowerRole<int>>();
+            this.settings = serviceProvider.GetRequiredService<IOptions<ReplicaSetOptions>>().Value;
         }
 
         /// <summary>
@@ -368,7 +373,6 @@ namespace Orleans.Consensus.UnitTests
                     this.stateMachine.Received().Apply(Arg.Is(this.journal.Entries[0]));
                     this.stateMachine.Received().Apply(Arg.Is(this.journal.Entries[1]));
                 });
-            this.settings.ApplyEntriesOnFollowers.Returns(true);
         }
 
         /// <summary>
@@ -378,12 +382,19 @@ namespace Orleans.Consensus.UnitTests
         [Fact]
         public async Task EntriesAreNotAppliedToStateMachineIfProhibitedBySettings()
         {
-            this.settings.ApplyEntriesOnFollowers.Returns(false);
-            await this.AppendValidEntriesWithSomeCommitted();
+            this.settings.ApplyEntriesOnFollowers = false;
+            try
+            {
+                await this.AppendValidEntriesWithSomeCommitted();
 
-            // Check that the operations were not applied to the state machine.
-            await this.stateMachine.DidNotReceive().Apply(Arg.Is(this.journal.Entries[0]));
-            await this.stateMachine.DidNotReceive().Apply(Arg.Is(this.journal.Entries[1]));
+                // Check that the operations were not applied to the state machine.
+                await this.stateMachine.DidNotReceive().Apply(Arg.Is(this.journal.Entries[0]));
+                await this.stateMachine.DidNotReceive().Apply(Arg.Is(this.journal.Entries[1]));
+            }
+            finally
+            {
+                this.settings.ApplyEntriesOnFollowers = true;
+            }
         }
 
         /// <summary>

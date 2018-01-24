@@ -1,15 +1,17 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.24720.0
+# Visual Studio 15
+VisualStudioVersion = 15.0.27130.2024
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Consensus", "Orleans.Consensus\Orleans.Consensus.csproj", "{37611AB7-9468-44BB-8B45-C33D2FD58F94}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Consensus", "Orleans.Consensus\Orleans.Consensus.csproj", "{37611AB7-9468-44BB-8B45-C33D2FD58F94}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestConsole", "TestConsole\TestConsole.csproj", "{ADD0E713-6ACC-4A49-B333-A95C69C2AF4C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Consensus.Contract", "Orleans.Consensus.Contract\Orleans.Consensus.Contract.csproj", "{817A79EE-927A-4571-9B50-ED42E6B87079}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Consensus.Internal", "Orleans.Consensus.Internal\Orleans.Consensus.Internal.csproj", "{817A79EE-927A-4571-9B50-ED42E6B87079}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Consensus.UnitTests", "Orleans.Consensus.UnitTests\Orleans.Consensus.UnitTests.csproj", "{1EF27BA0-2CE3-42F4-8157-5544FEEDC6B3}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Consensus.UnitTests", "Orleans.Consensus.UnitTests\Orleans.Consensus.UnitTests.csproj", "{1EF27BA0-2CE3-42F4-8157-5544FEEDC6B3}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestSilo", "TestSilo\TestSilo.csproj", "{7FC7F77C-8A06-49D7-BA72-412509E5A464}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -33,8 +35,15 @@ Global
 		{1EF27BA0-2CE3-42F4-8157-5544FEEDC6B3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1EF27BA0-2CE3-42F4-8157-5544FEEDC6B3}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1EF27BA0-2CE3-42F4-8157-5544FEEDC6B3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7FC7F77C-8A06-49D7-BA72-412509E5A464}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7FC7F77C-8A06-49D7-BA72-412509E5A464}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7FC7F77C-8A06-49D7-BA72-412509E5A464}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7FC7F77C-8A06-49D7-BA72-412509E5A464}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {4F7FDA21-0718-44BB-B83E-0D01C78575F5}
 	EndGlobalSection
 EndGlobal

@@ -50,11 +50,11 @@
             // Configure the silo for the current environment.
             silo.SetSiloType(Silo.SiloType.Primary);
 
-            Trace.TraceInformation("Silo configuration: \n" + silo.Config.ToString(name));
+            Console.WriteLine("Silo configuration: \n" + silo.Config.ToString(name));
 
             silo.InitializeOrleansSilo();
-            Trace.TraceInformation("Successfully initialized Orleans silo '{0}' as a {1} node.", silo.Name, silo.Type);
-            Trace.TraceInformation("Starting Orleans silo '{0}' as a {1} node.", silo.Name, silo.Type);
+            Console.WriteLine("Successfully initialized Orleans silo '{0}' as a {1} node.", silo.Name, silo.Type);
+            Console.WriteLine("Starting Orleans silo '{0}' as a {1} node.", silo.Name, silo.Type);
 
             if (silo.StartOrleansSilo())
             {
@@ -67,22 +67,9 @@
             var config = new ClusterConfiguration();
 
             // Configure logging and metrics collection.
-            config.Defaults.TraceFilePattern = Path.GetTempPath() + "{0}_{1}.log";
             config.Defaults.StatisticsCollectionLevel = StatisticsLevel.Info;
             config.Defaults.StatisticsLogWriteInterval = TimeSpan.FromDays(6);
             config.Defaults.TurnWarningLengthThreshold = TimeSpan.FromSeconds(15);
-            config.Defaults.TraceToConsole = true;
-            config.Defaults.DefaultTraceLevel = Severity.Info;
-            /*config.Defaults.TraceLevelOverrides.Add(Tuple.Create("Orleans", Severity.Warning));
-            config.Defaults.TraceLevelOverrides.Add(Tuple.Create("Runtime", Severity.Warning));
-            config.Defaults.TraceLevelOverrides.Add(Tuple.Create("Dispatcher", Severity.Warning));
-            config.Defaults.TraceLevelOverrides.Add(Tuple.Create("MembershipOracle", Severity.Warning));
-            config.Defaults.TraceLevelOverrides.Add(Tuple.Create("DeploymentLoadPublisher", Severity.Warning));
-            config.Defaults.TraceLevelOverrides.Add(Tuple.Create("ReminderService", Severity.Warning));
-            config.Defaults.TraceLevelOverrides.Add(Tuple.Create("SiloLogStatistics", Severity.Warning));*/
-            config.Defaults.TraceLevelOverrides.Add(Tuple.Create("Catalog", Severity.Warning));
-            config.Defaults.TraceLevelOverrides.Add(Tuple.Create("sync.SafeTimerBase", Severity.Warning));
-            config.Defaults.TraceLevelOverrides.Add(Tuple.Create("asynTask.SafeTimerBase", Severity.Warning));
 
             // Configure providers
             config.Globals.RegisterBootstrapProvider<RaftBootstrap>(new RaftBootstrap().Name);
@@ -91,7 +78,7 @@
             config.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.MembershipTableGrain;
 
             // Configure clustering.
-            config.Globals.DeploymentId = "test";
+            config.Globals.ClusterId = "test";
             //config.Globals.ExpectedClusterSize = nodeList.Count; // An overestimate is tolerable.
             config.Globals.ResponseTimeout = TimeSpan.FromSeconds(90);
 

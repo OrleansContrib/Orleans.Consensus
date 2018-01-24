@@ -1,4 +1,7 @@
-﻿namespace Orleans.Consensus.Roles
+﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+
+namespace Orleans.Consensus.Roles
 {
     using System;
     using System.Linq;
@@ -33,10 +36,10 @@
 
         private readonly RegisterTimerDelegate registerTimer;
 
-        private readonly ISettings settings;
+        private readonly ReplicaSetOptions replicaSetOptions;
 
         public FollowerRole(
-            ILogger logger,
+            ILogger<FollowerRole<TOperation>> logger,
             IRoleCoordinator<TOperation> coordinator,
             IPersistentLog<TOperation> journal,
             IStateMachine<TOperation> stateMachine,
@@ -44,7 +47,7 @@
             IRaftVolatileState volatileState,
             IRandom random,
             RegisterTimerDelegate registerTimer,
-            ISettings settings)
+            IOptions<ReplicaSetOptions> replicaSetOptions)
         {
             this.logger = logger;
             this.coordinator = coordinator;
@@ -54,16 +57,16 @@
             this.volatileState = volatileState;
             this.random = random;
             this.registerTimer = registerTimer;
-            this.settings = settings;
+            this.replicaSetOptions = replicaSetOptions.Value;
         }
 
         public string RoleName => "Follower";
 
         public async Task Enter()
         {
-            this.logger.LogInfo("Becoming follower.");
+            this.logger.LogInformation("Becoming follower.");
 
-            if (this.settings.ApplyEntriesOnFollowers && this.stateMachine != null)
+            if (this.replicaSetOptions.ApplyEntriesOnFollowers && this.stateMachine != null)
             {
                 await this.stateMachine.Reset();
             }
@@ -78,7 +81,7 @@
 
         public Task Exit()
         {
-            this.logger.LogInfo("Leaving follower state.");
+            this.logger.LogInformation("Leaving follower state.");
             this.electionTimer?.Dispose();
             return Task.FromResult(0);
         }
@@ -87,12 +90,12 @@
         {
             bool voteGranted;
 
-            this.logger.LogInfo($"RequestVote: {request}");
+            this.logger.LogInformation($"RequestVote: {request}");
 
             // 1. Reply false if term < currentTerm(§5.1)
             if (request.Term < this.persistentState.CurrentTerm)
             {
-                this.logger.LogWarn($"Denying vote {request}. Requested term is older than current term.");
+                this.logger.LogWarning($"Denying vote {request}. Requested term is older than current term.");
                 voteGranted = false;
             }
             // 2. If votedFor is null or candidateId, and candidate’s log is at least as up-to-date as receiver’s
@@ -110,19 +113,19 @@
 
                 if (votedForAnotherServerInCurrentTerm)
                 {
-                    this.logger.LogWarn($"Denying vote {request}: Already voted for {this.persistentState.VotedFor}");
+                    this.logger.LogWarning($"Denying vote {request}: Already voted for {this.persistentState.VotedFor}");
                     voteGranted = false;
                 }
                 else if (this.journal.LastLogEntryId > request.LastLogEntryId)
                 {
-                    this.logger.LogWarn(
+                    this.logger.LogWarning(
                         $"Denying vote {request}: Local log is more up-to-date than candidate's log. "
                         + $"{this.journal.LastLogEntryId} > {request.LastLogEntryId}");
                     voteGranted = false;
                 }
                 else
                 {
-                    this.logger.LogInfo(
+                    this.logger.LogWarning(
                         $"Granting vote to {request.Candidate} with last log: {request.LastLogEntryId}.");
                     this.messagesSinceLastElectionExpiry++;
 
@@ -154,7 +157,7 @@
             // 1. Reply false if term < currentTerm (§5.1)
             if (request.Term < this.persistentState.CurrentTerm)
             {
-                this.logger.LogWarn(
+                this.logger.LogWarning(
                     $"Denying append {request}: Term is older than current term, {this.persistentState.CurrentTerm}.");
                 success = false;
             }
@@ -162,7 +165,7 @@
             else if (!this.journal.Contains(request.PreviousLogEntry))
             {
                 this.messagesSinceLastElectionExpiry++;
-                this.logger.LogWarn(
+                this.logger.LogWarning(
                     $"Denying append {request}: Local log does not contain previous entry. "
                     + $"Local: {this.journal.ProgressString()}");
                 success = false;
@@ -187,7 +190,7 @@
 
 #warning account for candidate and failed configuration entries
 
-                    this.logger.LogInfo($"Accepted append. Log is now: {this.journal.ProgressString()}");
+                    this.logger.LogInformation($"Accepted append. Log is now: {this.journal.ProgressString()}");
                 }
 
                 // 5. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry).
@@ -197,7 +200,7 @@
                         request.LeaderCommitIndex,
                         this.journal.LastLogEntryId.Index);
 
-                    if (this.settings.ApplyEntriesOnFollowers)
+                    if (this.replicaSetOptions.ApplyEntriesOnFollowers)
                     {
                         // If commitIndex > lastApplied: increment lastApplied, apply log[lastApplied] to state machine(§5.3)
                         await this.ApplyRemainingCommittedEntries();
@@ -220,11 +223,11 @@
             // If a message has been received since the last election timeout, reset the timer.
             if (this.messagesSinceLastElectionExpiry == 0)
             {
-                this.logger.LogInfo("Election timer expired with no recent messages, becoming candidate.");
+                this.logger.LogInformation("Election timer expired with no recent messages, becoming candidate.");
                 return this.coordinator.BecomeCandidate();
             }
 
-            this.logger.LogVerbose($"Election timer expired. {this.messagesSinceLastElectionExpiry} recent messages. ");
+            this.logger.LogDebug($"Election timer expired. {this.messagesSinceLastElectionExpiry} recent messages. ");
             this.messagesSinceLastElectionExpiry = 0;
             this.ResetElectionTimer();
             return Task.FromResult(0);
@@ -235,8 +238,8 @@
             var randomTimeout =
                 TimeSpan.FromMilliseconds(
                     this.random.Next(
-                        this.settings.MinElectionTimeoutMilliseconds,
-                        this.settings.MaxElectionTimeoutMilliseconds));
+                        this.replicaSetOptions.MinElectionTimeoutMilliseconds,
+                        this.replicaSetOptions.MaxElectionTimeoutMilliseconds));
             this.electionTimer?.Dispose();
             this.electionTimer = this.registerTimer(
                 _ => this.ElectionTimerExpired(),
@@ -255,7 +258,7 @@
                     this.journal.GetCursor((int)this.volatileState.LastApplied)
                         .Take((int)(this.volatileState.CommitIndex - this.volatileState.LastApplied)))
                 {
-                    this.logger.LogInfo($"Applying {entry}.");
+                    this.logger.LogInformation($"Applying {entry}.");
                     if (entry.IsOperation)
                     {
                         await this.stateMachine.Apply(entry);

@@ -1,11 +1,10 @@
-﻿using Orleans.Consensus.Contract.Log;
+﻿/*
+using Orleans.Consensus.Contract.Log;
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Dapper;
 using Orleans.Consensus.Contract;
 
 namespace Orleans.Consensus.Log
@@ -162,3 +161,4 @@ namespace Orleans.Consensus.Log
         }
     }
 }
+*/

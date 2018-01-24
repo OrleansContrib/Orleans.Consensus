@@ -1,31 +1,55 @@
-﻿namespace Orleans.Consensus.UnitTests.Utilities
-{
-    using Orleans.Consensus.Contract;
+﻿using System;
+using Microsoft.Extensions.Logging;
 
+namespace Orleans.Consensus.UnitTests.Utilities
+{
     using Xunit.Abstractions;
 
-    internal class TestLogger : ILogger
+    public class XunitLoggerProvider : ILoggerProvider
     {
-        private readonly ITestOutputHelper output;
+        private readonly ITestOutputHelper testOutputHelper;
 
-        public TestLogger(ITestOutputHelper output)
+        public XunitLoggerProvider(ITestOutputHelper testOutputHelper)
         {
-            this.output = output;
+            this.testOutputHelper = testOutputHelper;
         }
 
-        public void LogInfo(string message)
+        public ILogger CreateLogger(string categoryName) => new XunitLogger(testOutputHelper, categoryName);
+
+        public void Dispose()
         {
-            this.output.WriteLine(message);
+        }
+    }
+
+    public class XunitLogger : ILogger
+    {
+        private readonly ITestOutputHelper testOutputHelper;
+        private readonly string categoryName;
+
+        public XunitLogger(ITestOutputHelper testOutputHelper, string categoryName)
+        {
+            this.testOutputHelper = testOutputHelper;
+            this.categoryName = categoryName;
         }
 
-        public void LogWarn(string message)
+        public IDisposable BeginScope<TState>(TState state) => NoopDisposable.Instance;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
         {
-            this.output.WriteLine($"[WARNING] {message}");
+            testOutputHelper.WriteLine($"{categoryName} [{eventId}] {formatter(state, exception)}");
+            if (exception != null)
+                testOutputHelper.WriteLine(exception.ToString());
         }
 
-        public void LogVerbose(string message)
+        private class NoopDisposable : IDisposable
         {
-            this.output.WriteLine($"[ERROR] {message}");
+            public static readonly NoopDisposable Instance = new NoopDisposable();
+
+            public void Dispose()
+            {
+            }
         }
     }
 }

@@ -1,11 +1,9 @@
 namespace Orleans.Consensus
 {
     using System;
-
-    using Orleans.Consensus.Contract;
     using Orleans.Runtime;
 
-    public class OrleansLogger : ILogger
+    public class OrleansLogger
     {
         private readonly Logger log;
 

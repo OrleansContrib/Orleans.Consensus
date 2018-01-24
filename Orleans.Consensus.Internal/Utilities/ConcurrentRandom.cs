@@ -1,13 +1,10 @@
 namespace Orleans.Consensus.Utilities
 {
     using System;
-    using System.Security.Cryptography;
     using Orleans.Consensus.Contract;
 
     public class ConcurrentRandom : IRandom
     {
-        private static readonly RNGCryptoServiceProvider GlobalRandom = new RNGCryptoServiceProvider();
-
         [ThreadStatic]
         private static Random local;
 
@@ -18,9 +15,7 @@ namespace Orleans.Consensus.Utilities
             var inst = local;
             if (inst == null)
             {
-                var buffer = new byte[4];
-                GlobalRandom.GetBytes(buffer);
-                local = inst = new Random(BitConverter.ToInt32(buffer, 0));
+                local = inst = new Random(Guid.NewGuid().GetHashCode());
             }
 
             return inst.Next(minValue, maxValue);

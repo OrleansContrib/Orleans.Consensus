@@ -1,27 +1,27 @@
-﻿namespace Orleans.Consensus.UnitTests
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using System;
+using System.Threading.Tasks;
+using FluentAssertions;
+using FluentAssertions.Common;
+
+using NSubstitute;
+
+using Orleans.Consensus.Actors;
+using Orleans.Consensus.Contract;
+using Orleans.Consensus.Contract.Log;
+using Orleans.Consensus.Contract.Messages;
+using Orleans.Consensus.Log;
+using Orleans.Consensus.Roles;
+using Orleans.Consensus.State;
+using Orleans.Consensus.UnitTests.Utilities;
+
+using Xunit;
+using Xunit.Abstractions;
+
+
+namespace Orleans.Consensus.UnitTests
 {
-    using System;
-    using System.Threading.Tasks;
-
-    using Autofac;
-    
-    using FluentAssertions;
-    using FluentAssertions.Common;
-
-    using NSubstitute;
-
-    using Orleans.Consensus.Actors;
-    using Orleans.Consensus.Contract;
-    using Orleans.Consensus.Contract.Log;
-    using Orleans.Consensus.Contract.Messages;
-    using Orleans.Consensus.Log;
-    using Orleans.Consensus.Roles;
-    using Orleans.Consensus.State;
-    using Orleans.Consensus.UnitTests.Utilities;
-
-    using Xunit;
-    using Xunit.Abstractions;
-
     public class LeaderRoleTests
     {
         private readonly IRoleCoordinator<int> coordinator;
@@ -30,7 +30,7 @@
 
         private readonly InMemoryPersistentState persistentState;
         
-        private readonly LeaderRole<int> role;
+        private readonly ILeaderRole<int> role;
 
         private readonly MockTimers timers;
 
@@ -44,12 +44,12 @@
 
         public LeaderRoleTests(ITestOutputHelper output)
         {
-            var builder = new ContainerBuilder();
-            builder.Register(_ => Substitute.For<IRaftGrain<int>>()).InstancePerDependency();
-            builder.RegisterInstance<ILogger>(new TestLogger(output));
+            var serviceCollection = new ServiceCollection();
+            serviceCollection.AddTransient(_ => Substitute.For<IRaftGrain<int>>());
+            serviceCollection.AddLogging(loggingBuilder => loggingBuilder.AddProvider(new XunitLoggerProvider(output)));
 
             this.volatileState = new VolatileState();
-            builder.RegisterInstance<IRaftVolatileState>(this.volatileState);
+            serviceCollection.AddSingleton<IRaftVolatileState>(this.volatileState);
             
             this.coordinator = Substitute.For<IRoleCoordinator<int>>();
             this.coordinator.StepDownIfGreaterTerm(Arg.Any<IMessage>())
@@ -61,34 +61,33 @@
             currentRole.Append(Arg.Any<AppendRequest<int>>())
                 .Returns(Task.FromResult(new AppendResponse { Term = 1, Success = true }));
             this.coordinator.Role.Returns(currentRole);
-            builder.RegisterInstance(this.coordinator);
+            serviceCollection.AddSingleton(this.coordinator);
 
             this.timers = new MockTimers();
-            builder.RegisterInstance<RegisterTimerDelegate>(this.timers.RegisterTimer);
+            serviceCollection.AddSingleton<RegisterTimerDelegate>(this.timers.RegisterTimer);
 
             this.persistentState = Substitute.ForPartsOf<InMemoryPersistentState>();
-            builder.RegisterInstance<IRaftPersistentState>(this.persistentState);
+            serviceCollection.AddSingleton<IRaftPersistentState>(this.persistentState);
 
             this.journal = Substitute.ForPartsOf<InMemoryLog<int>>();
-            builder.RegisterInstance<IPersistentLog<int>>(this.journal);
+            serviceCollection.AddSingleton<IPersistentLog<int>>(this.journal);
 
             this.identity = Substitute.For<IServerIdentity>();
             this.identity.Id.Returns(Guid.NewGuid().ToString());
-            builder.RegisterInstance(this.identity);
+            serviceCollection.AddSingleton(this.identity);
 
             this.members = new StaticMembershipProvider(this.identity);
             this.members.SetServers(new[] { this.identity.Id, "other1", "other2", "other3", "other4" });
-            builder.RegisterInstance<IMembershipProvider>(this.members);
+            serviceCollection.AddSingleton<IMembershipProvider>(this.members);
 
-            builder.RegisterInstance(Substitute.For<IStateMachine<int>>()).SingleInstance();
-            builder.RegisterType<FakeGrainFactory>().AsImplementedInterfaces().AsSelf().SingleInstance();
-            builder.RegisterType<LeaderRole<int>>().AsSelf().AsImplementedInterfaces().SingleInstance();
-            builder.RegisterInstance(Substitute.For<ISettings>());
-
+            serviceCollection.AddSingleton(Substitute.For<IStateMachine<int>>());
+            serviceCollection.AddSingleton<IGrainFactory, FakeGrainFactory>();
+            serviceCollection.AddTransient<ILeaderRole<int>, LeaderRole<int>>();
+            
             // After the container is configured, resolve required services.
-            var container = builder.Build();
-            this.role = container.Resolve<LeaderRole<int>>();
-            this.grainFactory = container.Resolve<FakeGrainFactory>();
+            var container = serviceCollection.BuildServiceProvider();
+            this.role = container.GetRequiredService<ILeaderRole<int>>();
+            this.grainFactory = container.GetRequiredService<IGrainFactory>() as FakeGrainFactory;
 
             this.OnRaftGrainCreated =
                 (id, grain) =>

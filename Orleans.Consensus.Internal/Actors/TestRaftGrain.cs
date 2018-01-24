@@ -3,8 +3,7 @@ namespace Orleans.Consensus.Actors
     using System;
     using System.Text;
     using System.Threading.Tasks;
-
-    using Autofac;
+    
 
     using Orleans.Consensus.Contract;
     using Orleans.Consensus.Contract.Log;
@@ -50,7 +49,7 @@ namespace Orleans.Consensus.Actors
             return Task.FromResult(this.stateMachine.GetValue());
         }
 
-        protected override IStateMachine<string> GetStateMachine(IComponentContext context) => this.stateMachine;
+        protected override IStateMachine<string> GetStateMachine(IServiceProvider context) => this.stateMachine;
 
         /// <summary>
         /// This method is called at the end of the process of activating a grain.

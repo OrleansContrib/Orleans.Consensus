@@ -1,27 +1,26 @@
-﻿namespace Orleans.Consensus.UnitTests
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using System;
+using System.Threading.Tasks;
+using FluentAssertions;
+
+using NSubstitute;
+
+using Orleans.Consensus.Actors;
+using Orleans.Consensus.Contract;
+using Orleans.Consensus.Contract.Log;
+using Orleans.Consensus.Contract.Messages;
+using Orleans.Consensus.Log;
+using Orleans.Consensus.Roles;
+using Orleans.Consensus.State;
+using Orleans.Consensus.UnitTests.Utilities;
+
+using Xunit;
+using Xunit.Abstractions;
+
+namespace Orleans.Consensus.UnitTests
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Threading.Tasks;
-
-    using Autofac;
-
-    using FluentAssertions;
-
-    using NSubstitute;
-
-    using Orleans.Consensus.Actors;
-    using Orleans.Consensus.Contract;
-    using Orleans.Consensus.Contract.Log;
-    using Orleans.Consensus.Contract.Messages;
-    using Orleans.Consensus.Log;
-    using Orleans.Consensus.Roles;
-    using Orleans.Consensus.State;
-    using Orleans.Consensus.UnitTests.Utilities;
-
-    using Xunit;
-    using Xunit.Abstractions;
-
     public class CandidateRoleTests
     {
         private const int MinElectionTime = 72;
@@ -40,7 +39,7 @@
 
         private readonly CandidateRole<int> role;
 
-        private readonly ISettings settings;
+        private readonly ReplicaSetOptions settings;
 
         private readonly MockTimers timers;
 
@@ -52,27 +51,28 @@
 
         private readonly FakeGrainFactory grainFactory;
 
-        private readonly IContainer container;
+        private readonly IServiceProvider serviceProvider;
 
         public CandidateRoleTests(ITestOutputHelper output)
         {
-            var builder = new ContainerBuilder();
-            builder.Register(_ => Substitute.For<IRaftGrain<int>>()).InstancePerDependency();
-            builder.RegisterInstance<ILogger>(new TestLogger(output));
+            var services = new ServiceCollection();
+            services.AddTransient<IRaftGrain<int>>(_ => Substitute.For<IRaftGrain<int>>());
+            services.AddLogging(loggingBuilder => loggingBuilder.AddProvider(new XunitLoggerProvider(output)));
 
             this.volatileState = new VolatileState();
-            builder.RegisterInstance<IRaftVolatileState>(this.volatileState);
+            services.AddSingleton<IRaftVolatileState>(this.volatileState);
             
             // Configure settings
-            this.settings = Substitute.For<ISettings>();
-            this.settings.MinElectionTimeoutMilliseconds.Returns(MinElectionTime);
-            this.settings.MaxElectionTimeoutMilliseconds.Returns(MaxElectionTime);
-            builder.RegisterInstance(this.settings);
+            services.Configure<ReplicaSetOptions>(options =>
+            {
+                options.MinElectionTimeoutMilliseconds = MinElectionTime;
+                options.MaxElectionTimeoutMilliseconds = MaxElectionTime;
+            });
 
             // Rig random number generator to always return the same value.
             this.random = Substitute.For<IRandom>();
             this.random.Next(Arg.Any<int>(), Arg.Any<int>()).Returns(RiggedRandomResult);
-            builder.RegisterInstance(this.random);
+            services.AddSingleton<IRandom>(this.random);
 
             this.coordinator = Substitute.For<IRoleCoordinator<int>>();
             this.coordinator.StepDownIfGreaterTerm(Arg.Any<IMessage>())
@@ -84,33 +84,34 @@
             currentRole.Append(Arg.Any<AppendRequest<int>>())
                 .Returns(Task.FromResult(new AppendResponse { Term = 1, Success = true }));
             this.coordinator.Role.Returns(currentRole);
-            builder.RegisterInstance(this.coordinator);
+            services.AddSingleton<IRoleCoordinator<int>>(this.coordinator);
 
             this.timers = new MockTimers();
-            builder.RegisterInstance<RegisterTimerDelegate>(this.timers.RegisterTimer);
+            services.AddSingleton<RegisterTimerDelegate>(this.timers.RegisterTimer);
 
             this.persistentState = Substitute.ForPartsOf<InMemoryPersistentState>();
-            builder.RegisterInstance<IRaftPersistentState>(this.persistentState);
+            services.AddSingleton<IRaftPersistentState>(this.persistentState);
 
             this.journal = Substitute.ForPartsOf<InMemoryLog<int>>();
-            builder.RegisterInstance<IPersistentLog<int>>(this.journal);
+            services.AddSingleton<IPersistentLog<int>>(this.journal);
 
             this.identity = Substitute.For<IServerIdentity>();
             this.identity.Id.Returns(Guid.NewGuid().ToString());
-            builder.RegisterInstance(this.identity);
+            services.AddSingleton<IServerIdentity>(this.identity);
 
             this.members = new StaticMembershipProvider(this.identity);
             this.members.SetServers(new[] { this.identity.Id, "other1", "other2", "other3", "other4" });
-            builder.RegisterInstance<IMembershipProvider>(this.members);
+            services.AddSingleton<IMembershipProvider>(this.members);
 
-            builder.RegisterType<FakeGrainFactory>().AsImplementedInterfaces().AsSelf().SingleInstance();
+            services.AddSingleton<IGrainFactory, FakeGrainFactory>();
 
             // After the container is configured, resolve required services.
-            builder.RegisterType<CandidateRole<int>>().AsImplementedInterfaces().AsSelf().SingleInstance();
-            this.container = builder.Build();
-            this.role = this.container.Resolve<CandidateRole<int>>();
-            this.grainFactory = this.container.Resolve<FakeGrainFactory>();
-
+            services.AddSingleton<CandidateRole<int>>();
+            this.serviceProvider = services.BuildServiceProvider();
+            this.settings = this.serviceProvider.GetRequiredService<IOptions<ReplicaSetOptions>>().Value;
+            this.role = this.serviceProvider.GetRequiredService<CandidateRole<int>>();
+            this.grainFactory = (FakeGrainFactory)this.serviceProvider.GetRequiredService<IGrainFactory>();
+            
             this.OnRaftGrainCreated =
                 (id, grain) =>
                 grain.RequestVote(Arg.Any<RequestVoteRequest>())

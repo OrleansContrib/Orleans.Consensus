@@ -73,9 +73,8 @@
 
             // Configure logging and metrics collection.
             config.Gateways.Add(new IPEndPoint(IPAddress.Loopback, 12345));
-            config.TraceToConsole = true;
             // Configure clustering.
-            config.DeploymentId = "test";
+            config.ClusterId = "test";
             //config.Globals.ExpectedClusterSize = nodeList.Count; // An overestimate is tolerable.
             config.ResponseTimeout = TimeSpan.FromSeconds(90);
 

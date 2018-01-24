@@ -1,4 +1,7 @@
-﻿namespace Orleans.Consensus.UnitTests.Utilities
+﻿using Microsoft.Extensions.DependencyInjection;
+using Orleans.Runtime;
+
+namespace Orleans.Consensus.UnitTests.Utilities
 {
     using System;
     using System.Collections.Concurrent;
@@ -27,11 +30,11 @@
         private readonly ConcurrentDictionary<Tuple<Type, int>, IGrainObserver> objectReferences =
             new ConcurrentDictionary<Tuple<Type, int>, IGrainObserver>();
 
-        private readonly IComponentContext container;
+        private readonly IServiceProvider serviceProvider;
 
-        public FakeGrainFactory(IComponentContext container)
+        public FakeGrainFactory(IServiceProvider serviceProvider)
         {
-            this.container = container.Resolve<IComponentContext>();
+            this.serviceProvider = serviceProvider;
         }
 
         public Action<object, IGrain> OnGrainCreated { get; set; } = (_, __) => { };
@@ -48,7 +51,7 @@
 
         private TGrainInterface CreateGrain<TGrainInterface>(object primaryKey) where TGrainInterface : IGrain
         {
-            var result = (TGrainInterface)this.container.Resolve(typeof(TGrainInterface));
+            var result = ActivatorUtilities.GetServiceOrCreateInstance<TGrainInterface>(this.serviceProvider);
             this.OnGrainCreated?.Invoke(primaryKey, result);
             return result;
         }
@@ -101,6 +104,10 @@
         {
             this.objectReferences.TryRemove(Tuple.Create(typeof(TGrainObserverInterface), obj.GetHashCode()), out obj);
             return Task.FromResult(0);
+        }
+
+        public void BindGrainReference(IAddressable grain)
+        {
         }
 
         public TGrainInterface GetGrain<TGrainInterface>(

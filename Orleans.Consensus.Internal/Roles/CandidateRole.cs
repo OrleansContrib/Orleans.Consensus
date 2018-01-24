@@ -1,4 +1,7 @@
-﻿namespace Orleans.Consensus.Roles
+﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+
+namespace Orleans.Consensus.Roles
 {
     using System;
     using System.Collections.Generic;
@@ -28,7 +31,7 @@
 
         private readonly IMembershipProvider membershipProvider;
 
-        private readonly ISettings settings;
+        private readonly ReplicaSetOptions replicaSetOptions;
 
         private readonly IRaftPersistentState persistentState;
 
@@ -44,7 +47,7 @@
 
         public CandidateRole(
             IRoleCoordinator<TOperation> local,
-            ILogger logger,
+            ILogger<CandidateRole<TOperation>> logger,
             IPersistentLog<TOperation> journal,
             IRaftPersistentState persistentState,
             IRaftVolatileState volatileState,
@@ -53,7 +56,7 @@
             RegisterTimerDelegate registerTimer,
             IServerIdentity identity,
             IMembershipProvider membershipProvider,
-            ISettings settings)
+            IOptions<ReplicaSetOptions> replicaSetOptions)
         {
             this.local = local;
             this.logger = logger;
@@ -65,14 +68,14 @@
             this.registerTimer = registerTimer;
             this.identity = identity;
             this.membershipProvider = membershipProvider;
-            this.settings = settings;
+            this.replicaSetOptions = replicaSetOptions.Value;
         }
 
         public string RoleName => "Candidate";
 
         public async Task Enter()
         {
-            this.logger.LogInfo("Becoming candidate.");
+            this.logger.LogInformation("Becoming candidate.");
 
             // There is currently no leader.
             this.volatileState.LeaderId = null;
@@ -90,7 +93,7 @@
 
         public Task Exit()
         {
-            this.logger.LogInfo("Leaving candidate state.");
+            this.logger.LogInformation("Leaving candidate state.");
             this.electionTimer?.Dispose();
             this.cancellation.Cancel();
             return Task.FromResult(0);
@@ -119,7 +122,7 @@
             }
 
             // The requester is from an older term.
-            this.logger.LogInfo($"Denying append from {request.Leader}.");
+            this.logger.LogInformation($"Denying append from {request.Leader}.");
             return new AppendResponse { Success = false, Term = this.persistentState.CurrentTerm };
         }
 
@@ -166,13 +169,13 @@
                 }
 
                 this.votes++;
-                this.logger.LogInfo(
+                this.logger.LogInformation(
                     $"Received {this.votes} votes as candidate for term {this.persistentState.CurrentTerm}.");
 
                 // If votes received from majority of servers: become leader (§5.2)
                 if (this.votes >= this.QuorumSize)
                 {
-                    this.logger.LogInfo(
+                    this.logger.LogInformation(
                         $"Becoming leader for term {this.persistentState.CurrentTerm} with {this.votes}/{this.membershipProvider.OtherServers.Count + 1} votes.");
                     await this.local.BecomeLeader();
                     return;
@@ -185,15 +188,15 @@
             var randomTimeout =
                 TimeSpan.FromMilliseconds(
                     this.random.Next(
-                        this.settings.MinElectionTimeoutMilliseconds,
-                        this.settings.MaxElectionTimeoutMilliseconds));
+                        this.replicaSetOptions.MinElectionTimeoutMilliseconds,
+                        this.replicaSetOptions.MaxElectionTimeoutMilliseconds));
             this.electionTimer?.Dispose();
             this.electionTimer = this.registerTimer(
                 _ => this.local.BecomeCandidate(),
                 null,
                 randomTimeout,
                 randomTimeout);
-            this.logger.LogInfo($"Election timer set to fire in {randomTimeout.TotalMilliseconds}ms");
+            this.logger.LogInformation($"Election timer set to fire in {randomTimeout.TotalMilliseconds}ms");
         }
     }
 }

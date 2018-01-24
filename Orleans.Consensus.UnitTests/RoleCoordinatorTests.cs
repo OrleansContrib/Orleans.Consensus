@@ -1,23 +1,21 @@
-﻿using Autofac;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using System;
+using System.Threading.Tasks;
+
+using FluentAssertions;
+
+using NSubstitute;
+using Orleans.Consensus.Contract.Messages;
+using Orleans.Consensus.Roles;
+using Orleans.Consensus.State;
+using Orleans.Consensus.UnitTests.Utilities;
+
+using Xunit;
+using Xunit.Abstractions;
 
 namespace Orleans.Consensus.UnitTests
 {
-    using System;
-    using System.Threading.Tasks;
-    
-    using FluentAssertions;
-
-    using NSubstitute;
-
-    using Orleans.Consensus.Contract;
-    using Orleans.Consensus.Contract.Messages;
-    using Orleans.Consensus.Roles;
-    using Orleans.Consensus.State;
-    using Orleans.Consensus.UnitTests.Utilities;
-
-    using Xunit;
-    using Xunit.Abstractions;
-
     public class RoleCoordinatorTests
     {
         private readonly IRoleCoordinator<int> coordinator;
@@ -26,20 +24,20 @@ namespace Orleans.Consensus.UnitTests
 
         public RoleCoordinatorTests(ITestOutputHelper output)
         {
-            var builder = new ContainerBuilder();
-            builder.RegisterInstance<ILogger>(new TestLogger(output));
+            var serviceCollection = new ServiceCollection();
+            serviceCollection.AddLogging(loggingBuilder => loggingBuilder.AddProvider(new XunitLoggerProvider(output)));
 
             this.persistentState = Substitute.ForPartsOf<InMemoryPersistentState>();
-            builder.RegisterInstance<IRaftPersistentState>(this.persistentState);
+            serviceCollection.AddSingleton<IRaftPersistentState>(this.persistentState);
 
-            builder.RegisterInstance(Substitute.For<IFollowerRole<int>>()).AsImplementedInterfaces().AsSelf();
-            builder.RegisterInstance(Substitute.For<ILeaderRole<int>>()).AsImplementedInterfaces().AsSelf();
-            builder.RegisterInstance(Substitute.For<ICandidateRole<int>>()).AsImplementedInterfaces().AsSelf();
+            serviceCollection.AddSingleton(Substitute.For<IFollowerRole<int>>());
+            serviceCollection.AddSingleton(Substitute.For<ILeaderRole<int>>());
+            serviceCollection.AddSingleton(Substitute.For<ICandidateRole<int>>());
 
             // After the container is configured, resolve required services.
-            builder.RegisterType<RoleCoordinator<int>>().AsSelf().AsImplementedInterfaces().SingleInstance();
-            var container = builder.Build();
-            this.coordinator = container.Resolve<RoleCoordinator<int>>();
+            serviceCollection.AddSingleton<RoleCoordinator<int>>();
+            var serviceProvider = serviceCollection.BuildServiceProvider();
+            this.coordinator = serviceProvider.GetRequiredService<RoleCoordinator<int>>();
         }
 
         /// <summary>

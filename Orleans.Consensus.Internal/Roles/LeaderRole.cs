@@ -1,4 +1,6 @@
-﻿using Orleans.CodeGeneration;
+﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.CodeGeneration;
 using Orleans.Consensus.Contract.Messages;
 
 [assembly: KnownType(typeof(NotLeaderException))]
@@ -39,7 +41,7 @@ namespace Orleans.Consensus.Roles
 
         private readonly IMembershipProvider membershipProvider;
 
-        private readonly ISettings settings;
+        private readonly ReplicaSetOptions replicaSetOptions;
 
         private readonly IRaftPersistentState persistentState;
 
@@ -59,7 +61,7 @@ namespace Orleans.Consensus.Roles
 
         public LeaderRole(
             IRoleCoordinator<TOperation> coordinator,
-            ILogger logger,
+            ILogger<LeaderRole<TOperation>> logger,
             IPersistentLog<TOperation> journal,
             IStateMachine<TOperation> stateMachine,
             IRaftPersistentState persistentState,
@@ -68,7 +70,7 @@ namespace Orleans.Consensus.Roles
             RegisterTimerDelegate registerTimer,
             IServerIdentity identity,
             IMembershipProvider membershipProvider,
-            ISettings settings)
+            IOptions<ReplicaSetOptions> replicaSetOptions)
         {
             this.coordinator = coordinator;
             this.logger = logger;
@@ -80,8 +82,8 @@ namespace Orleans.Consensus.Roles
             this.registerTimer = registerTimer;
             this.identity = identity;
             this.membershipProvider = membershipProvider;
-            this.settings = settings;
-            this.heartbeatTimeout = TimeSpan.FromMilliseconds(this.settings.HeartbeatTimeoutMilliseconds);
+            this.replicaSetOptions = replicaSetOptions.Value;
+            this.heartbeatTimeout = TimeSpan.FromMilliseconds(this.replicaSetOptions.HeartbeatTimeoutMilliseconds);
         }
 
         private int QuorumSize => (this.followers.Count + 1) / 2;
@@ -90,7 +92,7 @@ namespace Orleans.Consensus.Roles
 
         public async Task Enter()
         {
-            this.logger.LogInfo("Becoming leader.");
+            this.logger.LogInformation("Becoming leader.");
 
             // Initialize volatile state on leader.
             foreach (var server in this.membershipProvider.OtherServers)
@@ -122,7 +124,7 @@ namespace Orleans.Consensus.Roles
 
         public Task Exit()
         {
-            this.logger.LogWarn("Leaving leader state.");
+            this.logger.LogWarning("Leaving leader state.");
             this.heartbeatTimer?.Dispose();
             this.cancellation.Cancel();
             return Task.FromResult(0);
@@ -147,7 +149,7 @@ namespace Orleans.Consensus.Roles
                 return await this.coordinator.Role.Append(request);
             }
 
-            this.logger.LogWarn($"Denying append from {request.Leader}.");
+            this.logger.LogWarning($"Denying append from {request.Leader}.");
             return new AppendResponse { Success = false, Term = this.persistentState.CurrentTerm };
         }
 
@@ -182,12 +184,12 @@ namespace Orleans.Consensus.Roles
         {
             if (entries != null && entries.Length > 0)
             {
-                this.logger.LogInfo($"Replicating {entries.Length} entries to {this.followers.Count} servers");
+                this.logger.LogInformation($"Replicating {entries.Length} entries to {this.followers.Count} servers");
                 await this.journal.AppendOrOverwrite(entries);
 
 #warning account for candidate and failed (overwritten) configuration entries
 
-                this.logger.LogInfo($"Leader log is: {this.journal.ProgressString()}");
+                this.logger.LogInformation($"Leader log is: {this.journal.ProgressString()}");
             }
 
             await this.Replicate();
@@ -215,7 +217,7 @@ namespace Orleans.Consensus.Roles
 
         public Task SendHeartBeats()
         {
-            this.logger.LogVerbose("heartbeat");
+            this.logger.LogTrace("heartbeat");
             if (this.lastMessageSentTime + this.heartbeatTimeout > DateTime.UtcNow)
             {
                 // Only send heartbeat if idle.
@@ -240,7 +242,7 @@ namespace Orleans.Consensus.Roles
                     Term = this.persistentState.CurrentTerm,
                     Entries =
                         this.journal.GetCursor((int)Math.Max(0, nextIndex - 1))
-                            .Take(this.settings.MaxLogEntriesPerAppendRequest)
+                            .Take(this.replicaSetOptions.MaxLogEntriesPerAppendRequest)
                             .ToArray()
                 };
 
@@ -252,7 +254,7 @@ namespace Orleans.Consensus.Roles
                 this.lastMessageSentTime = DateTime.UtcNow;
                 if (request.Entries.Length > 0)
                 {
-                    this.logger.LogInfo(
+                    this.logger.LogInformation(
                         $"Replicating to '{serverId}': prev: {request.PreviousLogEntry},"
                         + $" entries: [{string.Join(", ", request.Entries.Select(_ => _.Id))}]"
                         + $", next: {nextIndex}, match: {followerProgress.MatchIndex}");
@@ -272,7 +274,7 @@ namespace Orleans.Consensus.Roles
                     // For efficiency, only consider updating the committedIndex if matchIndex has changed.
                     if (newMatchIndex != followerProgress.MatchIndex)
                     {
-                        this.logger.LogInfo(
+                        this.logger.LogInformation(
                             $"Successfully appended entries {request.Entries?.FirstOrDefault().Id} to {newMatchIndex} on {serverId}");
                         followerProgress.MatchIndex = newMatchIndex;
 
@@ -282,7 +284,7 @@ namespace Orleans.Consensus.Roles
                     return;
                 }
 
-                this.logger.LogWarn($"Received failure response for append call with term of {response.Term}");
+                this.logger.LogWarning($"Received failure response for append call with term of {response.Term}");
                 if (await this.coordinator.StepDownIfGreaterTerm(response))
                 {
                     // This node is no longer a leader, so retire.
@@ -293,23 +295,23 @@ namespace Orleans.Consensus.Roles
                 {
                     // If the follower is lagging, jump immediately to its last log entry.
                     followerProgress.NextIndex = response.LastLogEntryId.Index;
-                    this.logger.LogInfo(
+                    this.logger.LogInformation(
                         $"Follower's last log is {response.LastLogEntryId}, jumping nextIndex to that index.");
                 }
                 else if (followerProgress.NextIndex > 0)
                 {
                     // Log mismatch, decrement and try again later.
                     --followerProgress.NextIndex;
-                    this.logger.LogWarn(
+                    this.logger.LogWarning(
                         $"Log mismatch must have occured on '{serverId}', decrementing nextIndex to {followerProgress.NextIndex}.");
                 }
 
                 // In an attempt to maintain fairness and retain leader status, bail out of catchup if the call has taken
                 // more than the allotted time.
                 if (this.callTimer.ElapsedMilliseconds
-                    >= this.settings.HeartbeatTimeoutMilliseconds / (this.membershipProvider.AllServers.Count - 1))
+                    >= this.replicaSetOptions.HeartbeatTimeoutMilliseconds / (this.membershipProvider.AllServers.Count - 1))
                 {
-                    this.logger.LogInfo(
+                    this.logger.LogInformation(
                         $"Bailing on '{serverId}' catch-up due to fairness. Elapsed: {this.callTimer.ElapsedMilliseconds}.");
                     break;
                 }
@@ -351,7 +353,7 @@ namespace Orleans.Consensus.Roles
                     }
 
                     // This entry is committed.
-                    this.logger.LogInfo(
+                    this.logger.LogInformation(
                         $"Recently committed entries from {this.volatileState.CommitIndex} to {index} with {replicas + 1}/{this.followers.Count + 1} replicas.");
                     this.volatileState.CommitIndex = index;
                     return this.ApplyRemainingCommittedEntries();
@@ -369,7 +371,7 @@ namespace Orleans.Consensus.Roles
                     this.journal.GetCursor((int)this.volatileState.LastApplied)
                         .Take((int)(this.volatileState.CommitIndex - this.volatileState.LastApplied)))
                 {
-                    this.logger.LogInfo($"Applying {entry}.");
+                    this.logger.LogInformation($"Applying {entry}.");
                     if (entry.IsOperation)
                     {
                         await this.stateMachine.Apply(entry);
